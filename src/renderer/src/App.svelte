@@ -1052,6 +1052,12 @@
     onclose={() => (selected = null)}
     onedit={() => edit(open.event)}
     ondelete={() => remove(open.event)}
+    oncopy={() =>
+      // A toast like Google's "Successfully copied to clipboard". The popover stays open.
+      window.api.copyText(open.event.joinUrl!).then(
+        () => showNote('Meeting link copied'),
+        () => showNote('Could not copy the meeting link')
+      )}
     onrespond={(answer, scope) => respond(open.event, answer, scope)}
   />
 {/if}

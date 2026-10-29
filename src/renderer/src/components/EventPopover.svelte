@@ -15,6 +15,7 @@
     onclose,
     onedit,
     ondelete,
+    oncopy,
     onrespond
   }: {
     event: CalendarEvent
@@ -24,6 +25,7 @@
     onclose: () => void
     onedit: () => void
     ondelete: () => void
+    oncopy: () => void
     onrespond: (answer: Answer, scope: Scope) => void
   } = $props()
 
@@ -125,7 +127,6 @@
     }
     return `${formats.day.format(start)}, ${formats.time.format(start)} – ${formats.day.format(end)}, ${formats.time.format(end)}`
   })
-  let copied = $state(false)
   // Outlook declines an invite, so the organizer knows. Google only takes it off this calendar, like Google web.
   const deleteLabel = $derived(
     event.cancelled ? 'Remove event' : !invite ? 'Delete event' : account?.provider === 'google' ? 'Remove from this calendar' : 'Decline and remove'
@@ -211,13 +212,8 @@
         <button
           class="icon-btn"
           aria-label="Copy meeting link"
-          title={copied ? 'Copied' : 'Copy meeting link'}
-          onclick={() =>
-            // Main copies it. On an error the button just shows no "Copied", not an unhandled error.
-            window.api.copyText(event.joinUrl!).then(
-              () => (copied = true),
-              () => {}
-            )}
+          title="Copy meeting link"
+          onclick={oncopy}
         >
           <svg viewBox="0 0 24 24"><path d="M16 1H4a2 2 0 0 0-2 2v14h2V3h12zm3 4H8a2 2 0 0 0-2 2v14c0 1.1.9 2 2 2h11a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2m0 16H8V7h11z" /></svg>
         </button>
