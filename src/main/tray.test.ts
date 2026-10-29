@@ -1,0 +1,42 @@
+import type { MenuItemConstructorOptions } from 'electron'
+import { describe, expect, it, vi } from 'vitest'
+import type { Account } from '../shared/api'
+import { createTray } from './tray'
+
+const tray = vi.hoisted(() => ({ setToolTip: vi.fn(), setContextMenu: vi.fn(), on: vi.fn() }))
+vi.mock('electron', () => ({
+  app: { isPackaged: false, getLoginItemSettings: () => ({ openAtLogin: false }) },
+  // The menu is its template, so the test can read it.
+  Menu: { buildFromTemplate: (template: unknown) => template },
+  nativeImage: { createFromPath: () => ({ resize: () => ({}) }) },
+  Tray: vi.fn(function () {
+    return tray
+  })
+}))
+vi.mock('../../resources/icon.png?asset', () => ({ default: '' }))
+
+const lastMenu = (): MenuItemConstructorOptions[] => tray.setContextMenu.mock.lastCall![0]
+
+describe('createTray', () => {
+  it('offers a sign-in for each signed-out account and says so in the tooltip', () => {
+    const signIn = vi.fn()
+    const showSignedOut = createTray({ open: vi.fn(), signIn, syncNow: vi.fn(), quit: vi.fn() })
+    expect(lastMenu()[0].label).toBe('Open Busy Peasy')
+
+    showSignedOut([{ id: 2, email: 'me@work.com' } as Account])
+    expect(lastMenu()[0].label).toBe('Sign in to me@work.com')
+    expect(lastMenu()[1].type).toBe('separator')
+    expect(tray.setToolTip).toHaveBeenLastCalledWith('Busy Peasy — sign-in needed')
+    lastMenu()[0].click!({} as never, undefined, {} as never)
+    expect(signIn).toHaveBeenCalledWith(2)
+
+    // The same list again (every sync): the menu the user may have open stays.
+    const builds = tray.setContextMenu.mock.calls.length
+    showSignedOut([{ id: 2, email: 'me@work.com' } as Account])
+    expect(tray.setContextMenu.mock.calls.length).toBe(builds)
+
+    showSignedOut([])
+    expect(lastMenu()[0].label).toBe('Open Busy Peasy')
+    expect(tray.setToolTip).toHaveBeenLastCalledWith('Busy Peasy')
+  })
+})

@@ -1,0 +1,9 @@
+// Read from the gitignored .env at build time.
+interface ImportMetaEnv {
+  readonly MAIN_VITE_GOOGLE_CLIENT_ID: string
+  readonly MAIN_VITE_GOOGLE_CLIENT_SECRET: string
+}
+
+interface ImportMeta {
+  readonly env: ImportMetaEnv
+}

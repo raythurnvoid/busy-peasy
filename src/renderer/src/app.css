@@ -1,0 +1,187 @@
+/* Colors follow Google Calendar's Material 3 tokens. */
+:root {
+  color-scheme: light dark;
+  --primary: #0b57d0;
+  --on-primary: #fff;
+  --primary-container: #d3e3fd;
+  --on-primary-container: #0842a0;
+  --surface: #fff;
+  --surface-low: #f8fafd;
+  --surface-container: #f0f4f9;
+  --surface-high: #e9eef6;
+  --surface-highest: #dde3ea;
+  --on-surface: #1f1f1f;
+  --on-surface-variant: #444746;
+  --outline: #747775;
+  --outline-variant: #c4c7c5;
+  --secondary-container: #c2e7ff;
+  --error: #b3261e;
+  --accepted: #188038;
+  --declined: #d93025;
+  --now: #db372d;
+  --grid-line: #dde3ea;
+  --hover: rgb(68 71 70 / 8%);
+  --font: 'Segoe UI Variable', 'Segoe UI', Roboto, system-ui, sans-serif;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --primary: #a8c7fa;
+    --on-primary: #062e6f;
+    --primary-container: #0842a0;
+    --on-primary-container: #d3e3fd;
+    --surface: #131314;
+    --surface-low: #1b1b1b;
+    --surface-container: #1e1f20;
+    --surface-high: #282a2c;
+    --surface-highest: #333537;
+    --on-surface: #e3e3e3;
+    --on-surface-variant: #c4c7c5;
+    --outline: #8e918f;
+    --outline-variant: #444746;
+    --secondary-container: #004a77;
+    --error: #f2b8b5;
+    --accepted: #81c995;
+    --declined: #f28b82;
+    --now: #f28b82;
+    --grid-line: #333537;
+    --hover: rgb(227 227 227 / 8%);
+  }
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--surface-low);
+  color: var(--on-surface);
+  font-family: var(--font);
+  font-size: 0.875rem;
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+}
+
+#app {
+  height: 100%;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+/* While a drag runs (lib/drag.ts), the cursor is the same everywhere, like Google. */
+body[data-drag='move'],
+body[data-drag='move'] * {
+  cursor: move !important;
+}
+
+body[data-drag='ns-resize'],
+body[data-drag='ns-resize'] * {
+  cursor: ns-resize !important;
+}
+
+/* Read by screen readers, not shown. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* Round 40px icon button, used across the app. */
+.icon-btn {
+  display: inline-grid;
+  place-items: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--on-surface-variant);
+  cursor: pointer;
+}
+
+.icon-btn:hover {
+  background: var(--hover);
+}
+
+.icon-btn svg {
+  width: 1.5rem;
+  height: 1.5rem;
+  fill: currentColor;
+}
+
+/* Outlined pill button ("Today", view switcher). */
+.pill-btn {
+  height: 2.5rem;
+  padding: 0 1.5rem;
+  border: 1px solid var(--outline);
+  border-radius: 1.25rem;
+  background: transparent;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.pill-btn:hover {
+  background: var(--hover);
+}
+
+/* Filled primary pill ("Save", "Join meeting"). */
+.filled-btn {
+  height: 2.25rem;
+  padding: 0 1.5rem;
+  border: 0;
+  border-radius: 1.125rem;
+  background: var(--primary);
+  color: var(--on-primary);
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.filled-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+/* Google's text button ("More options", "Time zone"). */
+.text-btn {
+  height: 2.25rem;
+  padding: 0 0.75rem;
+  border: 0;
+  border-radius: 1.125rem;
+  background: transparent;
+  color: var(--primary);
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.text-btn:hover:not(:disabled) {
+  background: var(--hover);
+}
+
+@media (forced-colors: active) {
+  .icon-btn,
+  .pill-btn,
+  .filled-btn,
+  .text-btn {
+    border: 1px solid ButtonText;
+  }
+}

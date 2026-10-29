@@ -1,0 +1,4 @@
+allowBuilds:
+  electron: true
+  # Only used for Squirrel installers; we build NSIS.
+  electron-winstaller: false
