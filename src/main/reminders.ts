@@ -10,7 +10,8 @@ import { appUrl, openExternal } from './security'
 
 // Own windows, not Windows toasts: Do Not Disturb hides toasts, and a missed meeting is the worst case.
 // The heads-up (notifications) sits bottom-right of the screen with the mouse and never takes focus.
-// The alert (alarms) covers every screen, above full-screen apps, and rings until Join, Snooze or Dismiss.
+// The alert (alarms) covers every screen, above full-screen apps, and rings until Join, Snooze or Dismiss (opening the
+// event dismisses it too).
 
 type ReminderWindow = 'heads-up' | 'alert'
 

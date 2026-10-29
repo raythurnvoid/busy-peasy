@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron'
-import type { Api, DataChanged } from '../shared/api'
+import type { Api, CalendarEvent, DataChanged } from '../shared/api'
 
 // Every Api method goes through the single 'api' channel. Main checks the name and the caller.
 const names: (keyof Api)[] = [
@@ -24,6 +24,7 @@ const names: (keyof Api)[] = [
   'listReminders',
   'answerReminder',
   'dismissReminders',
+  'showEvent',
   'getSettings',
   'saveSettings'
 ]
@@ -42,5 +43,11 @@ contextBridge.exposeInMainWorld('api', {
     const listener = (_: IpcRendererEvent, accountId: number): void => callback(accountId)
     ipcRenderer.on('sign-in', listener)
     return () => ipcRenderer.off('sign-in', listener)
+  },
+  // A reminder asks to show this event.
+  onShowEvent(callback: (event: CalendarEvent) => void): () => void {
+    const listener = (_: IpcRendererEvent, event: CalendarEvent): void => callback(event)
+    ipcRenderer.on('show-event', listener)
+    return () => ipcRenderer.off('show-event', listener)
   }
 })

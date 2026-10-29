@@ -1,5 +1,5 @@
 import { clipboard, nativeTheme } from 'electron'
-import type { Api, EventInput, EventReminder, GuestEdit, GuestInput, Repeat, Scope } from '../shared/api'
+import type { Api, CalendarEvent, EventInput, EventReminder, GuestEdit, GuestInput, Repeat, Scope } from '../shared/api'
 import { GOOGLE_COLORS } from '../shared/colors'
 import { GUEST_FLAGS, MAX_GUESTS, canChangeTime, hasOwnCall, isEmail, isInvite, isOwnSeries } from '../shared/events'
 import { MAX_REMINDER_MINUTES, MIN_ALL_DAY_MINUTES, SNOOZE_CHOICES } from '../shared/reminders'
@@ -161,8 +161,15 @@ function colorChange(db: Db, calendarId: number, key: unknown, record: EventReco
   return change
 }
 
-// onAccountRemoved: the tray drops the account's sign-in item; no sync runs to tell it.
-export function createApi(db: Db, scheduler: SyncScheduler, reminders: ReminderScheduler, onAccountRemoved: () => void): Api {
+// onAccountRemoved: the tray drops the account's sign-in item; no sync runs to tell it. showEvent: brings up the main
+// window, on the event if it still exists.
+export function createApi(
+  db: Db,
+  scheduler: SyncScheduler,
+  reminders: ReminderScheduler,
+  onAccountRemoved: () => void,
+  showEvent: (event: CalendarEvent | null) => void
+): Api {
   return {
     listAccounts: async () => listAccounts(db),
     listCalendars: async () => listCalendars(db),
@@ -404,6 +411,10 @@ export function createApi(db: Db, scheduler: SyncScheduler, reminders: ReminderS
         return { eventId: r.eventId, fireAt: r.fireAt }
       })
       reminders.dismiss(clean)
+    },
+    showEvent: async (eventId) => {
+      check(Number.isSafeInteger(eventId))
+      showEvent(getEvent(db, eventId))
     },
     getSettings: async () => getSettings(db),
     saveSettings: async (settings) => {

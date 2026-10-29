@@ -77,6 +77,13 @@
     void window.api.answerReminder(r.eventId, action, r.fireAt, snooze)
   }
 
+  // Like a system notification: opening it answers it, so the alarm stops and does not cover the event's popover.
+  // Shown first, as the dismiss may close this window.
+  function open(r: Reminder): void {
+    void window.api.showEvent(r.eventId)
+    act(r, 'dismiss')
+  }
+
   const name = (r: Reminder): string => r.title || '(No title)'
   const early = (r: Reminder): boolean => beforeStart(now, r)
   // The rule (0) while it applies, else 5 minutes, like Google's next snoozes.
@@ -160,9 +167,13 @@
     </header>
     {#each list.slice(0, MAX_ROWS) as r (r.eventId)}
       <div class="alert-row">
-        <div class="label" class:late={r.stage === 'started'}>{when(r)}</div>
-        <div class="title" title={r.title}>{name(r)}</div>
-        <div class="sub">{range(r)}{r.location ? ` · ${r.location}` : ''}</div>
+        <!-- The whole row opens the event. The buttons are not inside it (a button cannot hold buttons): the grid puts
+             them on top of it. -->
+        <button class="open" title="Open in calendar" onclick={() => open(r)}>
+          <span class="label" class:late={r.stage === 'started'}>{when(r)}</span>
+          <span class="title" title={r.title}>{name(r)}</span>
+          <span class="sub">{range(r)}{r.location ? ` · ${r.location}` : ''}</span>
+        </button>
         <div class="buttons">
           {#if r.joinUrl}<button class="filled-btn" aria-label="Join {name(r)}" onclick={() => act(r, 'join')}>Join</button>{/if}
           <select aria-label="Snooze {name(r)} for" onchange={(e) => (picked[r.eventId] = Number(e.currentTarget.value))}>
@@ -183,17 +194,22 @@
     {#each list.slice(0, MAX_ROWS) as r (r.eventId)}
       {@const snooze = early(r) ? 'until 1 min before start' : '5 minutes'}
       <div class="heads-up-row">
-        <div class="text">
-          <div class="title" title={r.title}>{name(r)}</div>
-          <div class="sub">{when(r)} · {range(r)}</div>
+        <!-- Like the alarm: the row opens the event, and the buttons sit on top of it. -->
+        <button class="open" title="Open in calendar" onclick={() => open(r)}>
+          <span class="text">
+            <span class="title" title={r.title}>{name(r)}</span>
+            <span class="sub">{when(r)} · {range(r)}</span>
+          </span>
+        </button>
+        <div class="actions">
+          {#if r.joinUrl}<button class="filled-btn" aria-label="Join {name(r)}" onclick={() => act(r, 'join')}>Join</button>{/if}
+          <button class="icon-btn" aria-label="Snooze {name(r)} {snooze}" title="Snooze {snooze}" onclick={() => act(r, 'snooze', 0)}>
+            <svg viewBox="0 0 24 24"><path d="M9 11h3.6L9 15.2V17h6v-2h-3.6l3.6-4.2V9H9zm7-7.7 1.3-1.5 4.6 3.9-1.3 1.5zM3.3 7.2 2.1 5.7 6.7 1.8 8 3.3zM12 6a7 7 0 1 1 0 14 7 7 0 0 1 0-14m0-2a9 9 0 1 0 0 18 9 9 0 0 0 0-18" /></svg>
+          </button>
+          <button class="icon-btn" aria-label="Dismiss {name(r)}" title="Dismiss" onclick={() => act(r, 'dismiss')}>
+            <svg viewBox="0 0 24 24"><path d="M19 6.4 17.6 5 12 10.6 6.4 5 5 6.4 10.6 12 5 17.6 6.4 19l5.6-5.6 5.6 5.6 1.4-1.4-5.6-5.6z" /></svg>
+          </button>
         </div>
-        {#if r.joinUrl}<button class="filled-btn" aria-label="Join {name(r)}" onclick={() => act(r, 'join')}>Join</button>{/if}
-        <button class="icon-btn" aria-label="Snooze {name(r)} {snooze}" title="Snooze {snooze}" onclick={() => act(r, 'snooze', 0)}>
-          <svg viewBox="0 0 24 24"><path d="M9 11h3.6L9 15.2V17h6v-2h-3.6l3.6-4.2V9H9zm7-7.7 1.3-1.5 4.6 3.9-1.3 1.5zM3.3 7.2 2.1 5.7 6.7 1.8 8 3.3zM12 6a7 7 0 1 1 0 14 7 7 0 0 1 0-14m0-2a9 9 0 1 0 0 18 9 9 0 0 0 0-18" /></svg>
-        </button>
-        <button class="icon-btn" aria-label="Dismiss {name(r)}" title="Dismiss" onclick={() => act(r, 'dismiss')}>
-          <svg viewBox="0 0 24 24"><path d="M19 6.4 17.6 5 12 10.6 6.4 5 5 6.4 10.6 12 5 17.6 6.4 19l5.6-5.6 5.6 5.6 1.4-1.4-5.6-5.6z" /></svg>
-        </button>
       </div>
     {/each}
     {@render extra()}
@@ -213,6 +229,7 @@
   .title,
   .sub,
   .line {
+    display: block;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -255,22 +272,60 @@
     outline-offset: -2px;
   }
 
+  /* A row is a grid. The open button fills all of it, and the buttons after it in the HTML sit on top of it in the same
+     cells. It is a subgrid, so its text stays in the cells the buttons leave free. */
+  .open {
+    display: grid;
+    align-self: stretch;
+    min-width: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .open:hover {
+    background: var(--hover);
+  }
+
+  /* The card cuts what overflows, so the focus ring goes inside. */
+  .open:focus-visible {
+    outline-offset: -2px;
+  }
+
   /* Heads-up: 0.5rem padding top and bottom, 4rem rows. */
   .heads-up {
     padding: 0.5rem 0;
   }
 
   .heads-up-row {
-    display: flex;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
     align-items: center;
-    gap: 0.5rem;
+    column-gap: 0.5rem;
     height: 4rem;
-    padding: 0 0.5rem 0 1.25rem;
+  }
+
+  .heads-up .open {
+    grid-row: 1;
+    grid-column: 1 / -1;
+    grid-template-columns: subgrid;
+    align-items: center;
   }
 
   .heads-up .text {
-    flex: 1;
     min-width: 0;
+    padding-left: 1.25rem;
+  }
+
+  .actions {
+    display: flex;
+    grid-row: 1;
+    grid-column: 2;
+    align-items: center;
+    gap: 0.5rem;
+    padding-right: 0.5rem;
   }
 
   .heads-up .title {
@@ -310,10 +365,17 @@
     font-weight: 500;
   }
 
+  /* Rows: label, title, sub, buttons. */
   .alert-row {
-    display: flex;
-    flex-direction: column;
+    display: grid;
+    grid-template-rows: 1.25rem 1.75rem 1.25rem 1fr;
     height: 7.5rem;
+  }
+
+  .alert .open {
+    grid-row: 1 / -1;
+    grid-column: 1;
+    grid-template-rows: subgrid;
     padding: 0 1.25rem;
   }
 
@@ -338,10 +400,15 @@
     height: 1.25rem;
   }
 
+  /* Only as wide and high as the buttons, so a click beside them opens the event. */
   .buttons {
     display: flex;
+    grid-row: 4;
+    grid-column: 1;
+    align-self: start;
+    justify-self: start;
     gap: 0.5rem;
-    margin-top: 0.5rem;
+    margin: 0.5rem 1.25rem 0;
   }
 
   .buttons .pill-btn {

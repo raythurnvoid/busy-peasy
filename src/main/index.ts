@@ -1,6 +1,7 @@
 import { app, BrowserWindow, Menu, nativeTheme, Notification } from 'electron'
 import { join } from 'node:path'
 import icon from '../../resources/icon.png?asset'
+import type { CalendarEvent } from '../shared/api'
 import { createApi } from './api'
 import { listAccounts, listSessions } from './db/accounts'
 import { openDb } from './db/db'
@@ -96,6 +97,12 @@ function signInAgain(accountId: number): void {
   mainWindow?.webContents.send('sign-in', accountId)
 }
 
+// A click on a reminder's text. The page goes to the event's day and opens its popover.
+function showEvent(event: CalendarEvent | null): void {
+  showMainWindow()
+  if (event) mainWindow?.webContents.send('show-event', event)
+}
+
 registerAppScheme()
 app.enableSandbox()
 // Dev runs keep their own data (DB, Outlook cookies) apart from the installed app.
@@ -154,7 +161,7 @@ if (!app.requestSingleInstanceLock()) {
         }).show()
       }
     })
-    registerApi(createApi(db, scheduler, reminders, showSignedOut), devUrl)
+    registerApi(createApi(db, scheduler, reminders, showSignedOut, showEvent), devUrl)
     reminders.check()
     createMainWindow(!process.argv.includes(HIDDEN_ARG))
     // Every toast is a sign-in notice. This also gets clicks from the Notification Center and from an earlier app run,

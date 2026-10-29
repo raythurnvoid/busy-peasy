@@ -121,6 +121,7 @@
   let results: ScheduleList | undefined = $state()
   let schedule: ScheduleList | undefined = $state()
   let week: WeekView | undefined = $state()
+  let month: MonthView | undefined = $state()
   let popover: EventPopover | undefined = $state()
   // Search mode. ran: the text of the last search. events: its results, null until the first Enter. more: over 200.
   // The type is on $state, so TypeScript does not take search as always null in the code below.
@@ -271,6 +272,34 @@
       if (account) signInAgain(account)
     })
   })
+
+  // A click on a reminder's text. Not while a dialog or quick create is open, so unsaved work stays: the window only
+  // comes up.
+  $effect(() => {
+    return window.api.onShowEvent((event) => {
+      if (!draft && !document.querySelector('dialog[open]')) void showEvent(event)
+    })
+  })
+
+  // The event's day, with its popover open next to its chip or row. Not drawn (hidden weekend or declined, under
+  // "N more"): next to the middle of the view.
+  async function showEvent(event: CalendarEvent): Promise<void> {
+    colorMenu = null
+    selected = null
+    month?.closeMore()
+    goTo(event.allDay ? fromDateKey(event.startDate!) : new Date(event.start))
+    await loadEvents(range.start, range.days)
+    await tick()
+    const chip = document.querySelector<HTMLElement>(`main [data-id="${event.id}"]:not([aria-hidden])`)
+    // In Week and Day the chip can be out of the scrolled grid. Focused, so closing the popover goes back to it.
+    chip?.scrollIntoView({ block: 'center' })
+    chip?.focus({ preventScroll: true })
+    const main = document.querySelector('main')!.getBoundingClientRect()
+    selected = {
+      event: events.find((e) => e.id === event.id) ?? event,
+      anchor: chip?.getBoundingClientRect() ?? new DOMRect(main.left + main.width / 2, main.top, 0, 0)
+    }
+  }
 
   // The view and the search results again: results follow sync and edits too.
   function reload(): Promise<unknown> {
@@ -1009,6 +1038,7 @@
       </ScheduleList>
     {:else if view === 'month'}
       <MonthView
+        bind:this={month}
         start={range.start}
         month={anchor.getMonth()}
         weekends={showWeekends}

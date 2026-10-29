@@ -289,6 +289,8 @@ export interface Api {
   answerReminder(eventId: number, action: ReminderAction, fireAt: number, snooze?: number): Promise<void>
   // Dismiss all: the reminders one window lists.
   dismissReminders(shown: { eventId: number; fireAt: number }[]): Promise<void>
+  // A click on a reminder's text: the main window opens with the event's popover.
+  showEvent(eventId: number): Promise<void>
   getSettings(): Promise<Settings>
   saveSettings(settings: Settings): Promise<void>
 }

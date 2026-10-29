@@ -30,6 +30,7 @@ let defaults: Settings
 let syncNow: () => Promise<void>
 let check: () => void
 let onAccountRemoved: () => void
+let showEvent: () => void
 let scheduler: ReminderScheduler
 
 beforeEach(() => {
@@ -37,8 +38,9 @@ beforeEach(() => {
   syncNow = vi.fn(async () => {})
   check = vi.fn()
   onAccountRemoved = vi.fn()
+  showEvent = vi.fn()
   scheduler = { check, list: vi.fn(), answer: vi.fn(), dismiss: vi.fn() }
-  api = createApi(db, { syncNow, syncAccount: vi.fn(async () => {}) }, scheduler, onAccountRemoved)
+  api = createApi(db, { syncNow, syncAccount: vi.fn(async () => {}) }, scheduler, onAccountRemoved, showEvent)
   defaults = getSettings(db)
   nativeTheme.themeSource = 'system'
   vi.mocked(notifyDataChanged).mockClear()
@@ -138,6 +140,21 @@ describe('copyText', () => {
     await expect(api.copyText('x'.repeat(2001))).rejects.toThrow('Invalid arguments')
     await api.copyText('https://meet.google.com/abc-defg-hij')
     expect(vi.mocked(clipboard.writeText).mock.calls).toEqual([['https://meet.google.com/abc-defg-hij']])
+  })
+})
+
+describe('showEvent', () => {
+  it('passes the stored event on, or null when it is gone, so the window still opens', async () => {
+    await expect(api.showEvent('1' as never)).rejects.toThrow('Invalid arguments')
+    const account = upsertAccount(db, 'outlook', 'me@work.com', null, 0)
+    syncCalendarList(db, account, [{ remoteId: 'cal', name: 'Me', color: '#000', canEdit: true, isPrimary: true, defaultReminders: [], conference: null }])
+    const start = { dateTime: '2026-10-27T09:00:00Z' }
+    const end = { dateTime: '2026-10-27T10:00:00Z' }
+    upsertEvents(db, 1, [toRecord({ id: 'e1', summary: 'Focus', start, end })], 0)
+    const id = getEventByRemoteId(db, 1, 'e1')!.id
+    await api.showEvent(id)
+    await api.showEvent(id + 1)
+    expect(vi.mocked(showEvent).mock.calls).toEqual([[expect.objectContaining({ id, title: 'Focus' })], [null]])
   })
 })
 
@@ -446,7 +463,7 @@ describe('event writes', () => {
     const id = stored({ recurringEventId: 's1' })
     // The sync brings the series as the provider has it now.
     const syncAccount = vi.fn(async () => void db.prepare('UPDATE events SET title = ? WHERE id = ?').run('Synced', id))
-    api = createApi(db, { syncNow, syncAccount }, { check, list: vi.fn(), answer: vi.fn(), dismiss: vi.fn() }, onAccountRemoved)
+    api = createApi(db, { syncNow, syncAccount }, { check, list: vi.fn(), answer: vi.fn(), dismiss: vi.fn() }, onAccountRemoved, showEvent)
     vi.mocked(updateEvent).mockClear().mockResolvedValue(null)
     await expect(api.updateEvent(id, { repeat: { ...weekly, extra: 1 } as never }, { scope: 'following' })).resolves.toMatchObject({ title: 'Synced' })
     expect(syncAccount).toHaveBeenCalledWith(1)

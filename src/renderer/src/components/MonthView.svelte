@@ -181,6 +181,11 @@
   $effect(() => {
     if (more && !moreEvents.length) more = null
   })
+
+  // A reminder opens an event from outside: the list must not stay open under its popover.
+  export function closeMore(): void {
+    more = null
+  }
 </script>
 
 {#snippet line(item: Line, dayIndex: number, day: Date)}
