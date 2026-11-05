@@ -22,7 +22,7 @@ import { getSettings, saveSettings } from './db/settings'
 import { createEvent, deleteEvent, getSeries, respondEvent, updateEvent } from './event-writes'
 import { addGoogle, forgetGoogle } from './google-session'
 import { notifyDataChanged } from './ipc'
-import { forgetOutlookSession, newOutlookPartition, signInOutlook } from './outlook-session'
+import { askToSavePassword, forgetOutlookSession, newOutlookPartition, readOutlookPassword, signInOutlook } from './outlook-session'
 import { OWN_KEYS, type EventChange } from './providers/write'
 import type { ReminderScheduler } from './reminders'
 import { openExternal } from './security'
@@ -206,7 +206,8 @@ export function createApi(
       const existing = accountId === undefined ? null : getAccount(db, accountId)
       check(accountId === undefined || existing?.provider === 'outlook')
       // Signing in again reuses the account's partition. A new account gets its own.
-      const { partition, token } = await signInOutlook(existing?.session ?? newOutlookPartition(), !existing?.session)
+      const saved = existing?.secret ? await readOutlookPassword(existing.secret) : undefined
+      const { partition, token, typed } = await signInOutlook(existing?.session ?? newOutlookPartition(), !existing?.session, saved)
       if (existing && token.upn !== existing.email) {
         await forgetOutlookSession(partition)
         throw new Error(`You signed in as ${token.upn}. Sign in as ${existing.email}, or add ${token.upn} as a new account.`)
@@ -218,6 +219,8 @@ export function createApi(
       notifyDataChanged(ALL)
       // Not awaited: the sign-in is done, and the sidebar must stop offering "Start over" now.
       void scheduler.syncNow()
+      // Not awaited either: the question waits for the user. A filled password that worked is not asked again.
+      if (typed && typed.password !== saved?.password) void askToSavePassword(db, token.upn, typed).catch(() => {})
     },
     addGoogleAccount: async () => {
       await addGoogle(db)
