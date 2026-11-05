@@ -8,18 +8,22 @@ export const HIDDEN_ARG = '--hidden'
 // Kept at module level: a Tray with no reference is garbage collected and vanishes.
 let tray: Tray | null = null
 
-// Returns a function that shows the accounts that need a sign-in: a menu item for each, and a note in the tooltip.
+// showSignedOut shows the accounts that need a sign-in: a menu item for each, and a note in the tooltip.
+// showUpdate adds a restart item for a downloaded update.
 export function createTray(actions: {
   open(): void
   signIn(accountId: number): void
   syncNow(): void
+  update(): void
   quit(): void
-}): (signedOut: Account[]) => void {
+}): { showSignedOut(signedOut: Account[]): void; showUpdate(version: string): void } {
   tray = new Tray(nativeImage.createFromPath(icon).resize({ width: 16, height: 16 }))
   tray.setToolTip('Busy Peasy')
   let signedOut: Account[] = []
+  let update: string | null = null
   const menu = (): Menu =>
     Menu.buildFromTemplate([
+      ...(update ? [{ label: `Restart to update to ${update}`, click: actions.update }, { type: 'separator' as const }] : []),
       ...signedOut.map((account) => ({ label: `Sign in to ${account.email}`, click: () => actions.signIn(account.id) })),
       ...(signedOut.length ? [{ type: 'separator' as const }] : []),
       { label: 'Open Busy Peasy', click: actions.open },
@@ -41,12 +45,18 @@ export function createTray(actions: {
     ])
   tray.setContextMenu(menu())
   tray.on('click', actions.open)
-  return (accounts) => {
-    // Only on a change, so a menu the user has open is not replaced at every sync.
-    if (accounts.map((a) => a.id).join() === signedOut.map((a) => a.id).join()) return
-    signedOut = accounts
-    tray?.setToolTip(accounts.length ? 'Busy Peasy — sign-in needed' : 'Busy Peasy')
-    tray?.setContextMenu(menu())
+  return {
+    showSignedOut(accounts) {
+      // Only on a change, so a menu the user has open is not replaced at every sync.
+      if (accounts.map((a) => a.id).join() === signedOut.map((a) => a.id).join()) return
+      signedOut = accounts
+      tray?.setToolTip(accounts.length ? 'Busy Peasy — sign-in needed' : 'Busy Peasy')
+      tray?.setContextMenu(menu())
+    },
+    showUpdate(version) {
+      update = version
+      tray?.setContextMenu(menu())
+    }
   }
 }
 

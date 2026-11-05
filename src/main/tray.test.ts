@@ -20,7 +20,7 @@ const lastMenu = (): MenuItemConstructorOptions[] => tray.setContextMenu.mock.la
 describe('createTray', () => {
   it('offers a sign-in for each signed-out account and says so in the tooltip', () => {
     const signIn = vi.fn()
-    const showSignedOut = createTray({ open: vi.fn(), signIn, syncNow: vi.fn(), quit: vi.fn() })
+    const { showSignedOut } = createTray({ open: vi.fn(), signIn, syncNow: vi.fn(), update: vi.fn(), quit: vi.fn() })
     expect(lastMenu()[0].label).toBe('Open Busy Peasy')
 
     showSignedOut([{ id: 2, email: 'me@work.com' } as Account])
@@ -38,5 +38,20 @@ describe('createTray', () => {
     showSignedOut([])
     expect(lastMenu()[0].label).toBe('Open Busy Peasy')
     expect(tray.setToolTip).toHaveBeenLastCalledWith('Busy Peasy')
+  })
+
+  it('offers a restart for a downloaded update, above the sign-ins', () => {
+    const update = vi.fn()
+    const { showSignedOut, showUpdate } = createTray({ open: vi.fn(), signIn: vi.fn(), syncNow: vi.fn(), update, quit: vi.fn() })
+    showSignedOut([{ id: 2, email: 'me@work.com' } as Account])
+    showUpdate('0.2.0')
+    expect(lastMenu().map((item) => item.label ?? item.type).slice(0, 4)).toEqual([
+      'Restart to update to 0.2.0',
+      'separator',
+      'Sign in to me@work.com',
+      'separator'
+    ])
+    lastMenu()[0].click!({} as never, undefined, {} as never)
+    expect(update).toHaveBeenCalled()
   })
 })

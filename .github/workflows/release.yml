@@ -1,0 +1,74 @@
+name: Release
+
+# Builds the Windows installer and publishes it as a GitHub release for the version in package.json. Installed apps
+# read latest.yml from that release to auto-update (src/main/updater.ts). Bump the version in package.json first.
+#
+# The build reads the Google sign-in keys from the repo secrets MAIN_VITE_GOOGLE_CLIENT_ID and
+# MAIN_VITE_GOOGLE_CLIENT_SECRET (the same names as in the local .env).
+#
+# The installer is not code signed, so Windows SmartScreen warns on a first install. Updates install without it.
+#
+# Run with publish off to build and check everything without a release.
+
+on:
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: Publish the GitHub release
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    env:
+      MAIN_VITE_GOOGLE_CLIENT_ID: ${{ secrets.MAIN_VITE_GOOGLE_CLIENT_ID }}
+      MAIN_VITE_GOOGLE_CLIENT_SECRET: ${{ secrets.MAIN_VITE_GOOGLE_CLIENT_SECRET }}
+    steps:
+      - uses: actions/checkout@v7
+
+      # The pnpm version comes from "packageManager" in package.json.
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.22.0
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Test
+        run: pnpm test
+
+      # pnpm build also runs the type checks.
+      - name: Build the installer
+        run: |
+          pnpm build
+          pnpm exec electron-builder --win --publish never
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: windows
+          path: |
+            dist/*-setup.exe
+            dist/*-setup.exe.blockmap
+            dist/latest.yml
+          if-no-files-found: error
+
+      # The draft comes first, so the release exists before any upload and stays hidden until every file is there.
+      - name: Publish the release
+        if: inputs.publish
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          version=$(node -p "require('./package.json').version")
+          tag="v$version"
+          gh release view "$tag" > /dev/null 2>&1 || gh release create "$tag" --draft --title "$version" --target "$GITHUB_SHA"
+          gh release upload "$tag" dist/*-setup.exe dist/*-setup.exe.blockmap dist/latest.yml --clobber
+          gh release edit "$tag" --draft=false --latest

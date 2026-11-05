@@ -18,6 +18,7 @@ import { startReminders } from './reminders'
 import { appUrl, handleAppProtocol, hardenApp, registerAppScheme } from './security'
 import { createSyncScheduler, type SyncScheduler } from './sync/scheduler'
 import { createTray, enableStartAtLoginOnce, HIDDEN_ARG } from './tray'
+import { installUpdate, startUpdates } from './updater'
 
 const APP_ID = 'bonobo-senate.busypeasy'
 const POLL_INTERVAL = 2 * 60_000
@@ -31,6 +32,8 @@ let scheduler: SyncScheduler
 let lastFocusSync = 0
 let quitting = false
 let flushed = false
+// Set by the tray's restart item: this quit installs the downloaded update and starts the app again.
+let restartToUpdate = false
 
 // Same as --surface-low in app.css, so the window never shows white before the page paints.
 const background = (): string => (nativeTheme.shouldUseDarkColors ? '#1b1b1b' : '#f8fafd')
@@ -129,15 +132,20 @@ if (!app.requestSingleInstanceLock()) {
     })
     enableStartAtLoginOnce(listAccounts(db).length === 0)
     const reminders = startReminders(db, devUrl)
-    const updateTray = createTray({
+    const tray = createTray({
       open: showMainWindow,
       signIn: signInAgain,
       syncNow: () => void scheduler.syncNow(),
+      update: () => {
+        restartToUpdate = true
+        app.quit()
+      },
       quit: () => app.quit()
     })
     // Also at start and at every poll: a sync run where every account is signed out sends no notify.
-    const showSignedOut = (): void => updateTray(listAccounts(db).filter((a) => a.status === 'needs-sign-in'))
+    const showSignedOut = (): void => tray.showSignedOut(listAccounts(db).filter((a) => a.status === 'needs-sign-in'))
     showSignedOut()
+    startUpdates(tray.showUpdate)
     scheduler = createSyncScheduler({
       db,
       now: Date.now,
@@ -192,6 +200,9 @@ if (!app.requestSingleInstanceLock()) {
     // Also on a failed flush: else quitting stays true and every later Quit is ignored.
     const done = (): void => {
       flushed = true
+      // After the flush: the installer kills the app soon after it starts. A plain Quit with a downloaded update
+      // installs it too, on 'quit', but does not start the app again. If the install fails, this still quits.
+      if (restartToUpdate) installUpdate()
       app.quit()
     }
     void flush().then(done, done)
