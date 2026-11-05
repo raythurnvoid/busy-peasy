@@ -28,7 +28,10 @@ jobs:
       MAIN_VITE_GOOGLE_CLIENT_ID: ${{ secrets.MAIN_VITE_GOOGLE_CLIENT_ID }}
       MAIN_VITE_GOOGLE_CLIENT_SECRET: ${{ secrets.MAIN_VITE_GOOGLE_CLIENT_SECRET }}
     steps:
+      # The icons are in Git LFS.
       - uses: actions/checkout@v7
+        with:
+          lfs: true
 
       # The pnpm version comes from "packageManager" in package.json.
       - uses: pnpm/action-setup@v4
