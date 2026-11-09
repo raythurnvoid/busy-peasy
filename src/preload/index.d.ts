@@ -6,6 +6,7 @@ declare global {
       onDataChanged(callback: (change: DataChanged) => void): () => void
       onSignIn(callback: (accountId: number) => void): () => void
       onShowEvent(callback: (event: CalendarEvent) => void): () => void
+      onAgentCommand(callback: (name: string, args: Record<string, unknown>) => Promise<unknown>): () => void
     }
   }
 }

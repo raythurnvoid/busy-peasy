@@ -16,11 +16,20 @@ vi.mock('electron', () => ({
 vi.mock('../../resources/icon.png?asset', () => ({ default: '' }))
 
 const lastMenu = (): MenuItemConstructorOptions[] => tray.setContextMenu.mock.lastCall![0]
+const actions = (): Parameters<typeof createTray>[0] => ({
+  open: vi.fn(),
+  signIn: vi.fn(),
+  syncNow: vi.fn(),
+  update: vi.fn(),
+  agentAccess: () => 'off',
+  setAgentAccess: vi.fn(),
+  quit: vi.fn()
+})
 
 describe('createTray', () => {
   it('offers a sign-in for each signed-out account and says so in the tooltip', () => {
     const signIn = vi.fn()
-    const { showSignedOut } = createTray({ open: vi.fn(), signIn, syncNow: vi.fn(), update: vi.fn(), quit: vi.fn() })
+    const { showSignedOut } = createTray({ ...actions(), signIn })
     expect(lastMenu()[0].label).toBe('Open Busy Peasy')
 
     showSignedOut([{ id: 2, email: 'me@work.com' } as Account])
@@ -42,7 +51,7 @@ describe('createTray', () => {
 
   it('offers a restart for a downloaded update, above the sign-ins', () => {
     const update = vi.fn()
-    const { showSignedOut, showUpdate } = createTray({ open: vi.fn(), signIn: vi.fn(), syncNow: vi.fn(), update, quit: vi.fn() })
+    const { showSignedOut, showUpdate } = createTray({ ...actions(), update })
     showSignedOut([{ id: 2, email: 'me@work.com' } as Account])
     showUpdate('0.2.0')
     expect(lastMenu().map((item) => item.label ?? item.type).slice(0, 4)).toEqual([
@@ -53,5 +62,18 @@ describe('createTray', () => {
     ])
     lastMenu()[0].click!({} as never, undefined, {} as never)
     expect(update).toHaveBeenCalled()
+  })
+
+  it('shows the saved agent access and saves a new pick', () => {
+    const setAgentAccess = vi.fn()
+    createTray({ ...actions(), agentAccess: () => 'read', setAgentAccess })
+    const submenu = lastMenu().find((item) => item.label === 'Agent access')!.submenu as MenuItemConstructorOptions[]
+    expect(submenu.map((item) => [item.label, item.checked])).toEqual([
+      ['Off', false],
+      ['Read only', true],
+      ['Full access', false]
+    ])
+    submenu[2].click!({} as never, undefined, {} as never)
+    expect(setAgentAccess).toHaveBeenCalledWith('full')
   })
 })

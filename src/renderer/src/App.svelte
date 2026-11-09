@@ -29,6 +29,7 @@
   import ShortcutHelp from './components/ShortcutHelp.svelte'
   import Sidebar from './components/Sidebar.svelte'
   import WeekView from './components/WeekView.svelte'
+  import { click, fill, openDialog, snapshot } from './lib/agent'
   import { scheduleDays } from './lib/layout'
   import { asksScope, choicesFor } from './lib/repeat'
   import { formats, loadSettings, prefs } from './lib/settings.svelte'
@@ -280,6 +281,69 @@
       if (!draft && !document.querySelector('dialog[open]')) void showEvent(event)
     })
   })
+
+  // Agent commands (main/agent.ts). The app commands fail while a dialog or quick create is open, so unsaved work stays;
+  // snapshot, click and fill act on what is on screen, dialogs too. Main checked the access and found the events.
+  $effect(() => {
+    return window.api.onAgentCommand(async (name, args) => {
+      if (name === 'snapshot') return snapshot()
+      if (name === 'click') return click(args)
+      if (name === 'fill') return fill(args)
+      if (name === 'getState') return agentState()
+      if (draft || document.querySelector('dialog[open]')) {
+        throw new Error('A dialog is open in Busy Peasy. Finish it, or press Escape to close it.')
+      }
+      if (name === 'navigate') {
+        const next = VIEWS.find((v) => v.id === args.view)
+        if (args.view !== undefined && !next) throw new Error('view must be "day", "week", "month" or "schedule".')
+        if (args.date !== undefined && !(typeof args.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(args.date))) {
+          throw new Error('date must be YYYY-MM-DD.')
+        }
+        if (args.date) goTo(fromDateKey(args.date as string))
+        if (next) setView(next.id)
+      } else if (name === 'openEvent') {
+        await showEvent(args.event as CalendarEvent)
+      } else if (name === 'editEvent') {
+        await showEvent(args.event as CalendarEvent)
+        await edit(selected?.event ?? (args.event as CalendarEvent))
+        // edit() only shows a note for an event that is not loaded, e.g. in a hidden calendar.
+        if (!dialog) throw new Error('This event is not shown in the app. Its calendar may be hidden.')
+      } else if (name === 'openNewEvent') {
+        const input = args.input as EventInput
+        const calendar = input.calendarId === undefined ? defaultCalendar() : writable.find((c) => c.id === input.calendarId)
+        if (!calendar) throw new Error('No visible calendar you can edit has this id.')
+        if (!Number.isSafeInteger(input.start) || !Number.isSafeInteger(input.end) || input.end <= input.start) {
+          throw new Error('Give a start and a later end.')
+        }
+        dialog = { initial: { ...input, calendarId: calendar.id }, eventId: null, recurring: false, viewOnly: false, timesLocked: false }
+      } else if (name === 'search') {
+        if (typeof args.text !== 'string' || !args.text.trim()) throw new Error('Give a text.')
+        openSearch()
+        search!.text = search!.ran = args.text.trim()
+        await runSearch(search!.ran)
+      } else if (name === 'openSettings') {
+        settingsOpen = true
+      } else {
+        throw new Error('Unknown command')
+      }
+      await tick()
+      return agentState()
+    })
+  })
+
+  // What getState and the app commands tell an agent.
+  function agentState(): object {
+    return {
+      view,
+      date: dateKey(anchor),
+      title,
+      openEvent: selected ? { id: selected.event.id, title: selected.event.title } : null,
+      dialog: openDialog(),
+      quickCreate: draft !== null,
+      search: search ? { text: search.ran, found: found?.length ?? null } : null,
+      toast: toast?.text ?? null
+    }
+  }
 
   // The event's day, with its popover open next to its chip or row. Not drawn (hidden weekend or declined, under
   // "N more"): next to the middle of the view.

@@ -1,13 +1,17 @@
 import { app, BrowserWindow, Menu, nativeTheme, Notification } from 'electron'
 import { join } from 'node:path'
+// Unpacked: an outside Node runs it, and it cannot read inside app.asar.
+import cli from '../../resources/busy-peasy.mjs?asset&asarUnpack'
 import icon from '../../resources/icon.png?asset'
 import type { CalendarEvent } from '../shared/api'
+import { readAgentAccess, startAgent } from './agent'
 import { createApi } from './api'
 import { listAccounts, listSessions } from './db/accounts'
 import { openDb } from './db/db'
+import { getEvent } from './db/events'
 import { getSettings } from './db/settings'
 import { syncGoogle } from './google-session'
-import { notifyDataChanged, registerApi, writesDone } from './ipc'
+import { askPage, notifyDataChanged, registerApi, trackWrite, writesDone } from './ipc'
 import {
   removeUnusedPartitions,
   restoreOutlookSessionCookies,
@@ -29,6 +33,8 @@ const devUrl = app.isPackaged ? undefined : process.env['ELECTRON_RENDERER_URL']
 let mainWindow: BrowserWindow | null = null
 
 let scheduler: SyncScheduler
+// Starts after the tray, which first reads the saved access itself.
+let agent: ReturnType<typeof startAgent> | undefined
 let lastFocusSync = 0
 let quitting = false
 let flushed = false
@@ -107,6 +113,45 @@ function showEvent(event: CalendarEvent | null): void {
   if (event) mainWindow?.webContents.send('show-event', event)
 }
 
+// With Full access, commands that open something for the user bring the window up. Not with Read only: a popover in
+// a window that takes focus would get the user's next Delete key. The rest works in the hidden window too.
+function agentCommand(name: string, args: Record<string, unknown>): Promise<unknown> {
+  if (!mainWindow) return Promise.reject(new Error('Busy Peasy is quitting.'))
+  if (agent?.access() === 'full' && ['openEvent', 'editEvent', 'openNewEvent', 'openSettings'].includes(name)) showMainWindow()
+  return askPage(mainWindow.webContents, name, args)
+}
+
+// A trusted key press, so native behavior works too: Escape closes a dialog, Enter submits a form.
+async function pressKey(key: string): Promise<void> {
+  if (!mainWindow) throw new Error('Busy Peasy is quitting.')
+  const parts = key.split('+')
+  const keyCode = parts.pop()!
+  const modifiers = parts.map((m) => m.toLowerCase()) as Electron.KeyboardInputEvent['modifiers']
+  const contents = mainWindow.webContents
+  contents.sendInputEvent({ type: 'keyDown', keyCode, modifiers })
+  // A letter also types into a focused field, but not with Ctrl or Alt: Control+a must select, not type "a".
+  if (keyCode.length === 1 && !modifiers?.some((m) => m !== 'shift')) contents.sendInputEvent({ type: 'char', keyCode, modifiers })
+  contents.sendInputEvent({ type: 'keyUp', keyCode, modifiers })
+}
+
+// stayHidden: also while the window is in the tray. A JPEG at most 1280 px wide: a full-size PNG is over 1 MB, too much
+// for an agent.
+async function screenshot(): Promise<string> {
+  if (!mainWindow) throw new Error('Busy Peasy is quitting.')
+  const image = await mainWindow.webContents.capturePage(undefined, { stayHidden: true })
+  return image.resize({ width: Math.min(1280, image.getSize().width) }).toJPEG(80).toString('base64')
+}
+
+// Chromium shows the page to Windows UI Automation only for screen readers it knows, so other UIA tools (agents, test
+// tools) see an empty window. Never turned off here: a screen reader may need it. It costs some speed, so only with
+// agent access.
+function exposeToUiAutomation(): void {
+  if (agent?.access() !== 'off') app.setAccessibilitySupportEnabled(true)
+}
+
+// With these switches any program on this PC could restart the installed app and take it over, Outlook sign-in included.
+// Removed here, before Chromium starts its DevTools server. Dev runs keep them for Playwright and Playwriter.
+if (app.isPackaged) for (const name of ['remote-debugging-port', 'remote-debugging-pipe']) app.commandLine.removeSwitch(name)
 registerAppScheme()
 app.enableSandbox()
 // Dev runs keep their own data (DB, Outlook cookies) apart from the installed app.
@@ -116,7 +161,8 @@ if (app.isPackaged) Menu.setApplicationMenu(null)
 if (!app.requestSingleInstanceLock()) {
   app.quit()
 } else {
-  app.on('second-instance', showMainWindow)
+  // The agent CLI starts the app with --hidden when it finds no agent API: that must not bring up the window.
+  app.on('second-instance', (_, argv) => !argv.includes(HIDDEN_ARG) && showMainWindow())
 
   void app.whenReady().then(async () => {
     // Dev runs get their own id, so a click on a dev toast never goes to the installed app.
@@ -140,6 +186,11 @@ if (!app.requestSingleInstanceLock()) {
       update: () => {
         restartToUpdate = true
         app.quit()
+      },
+      agentAccess: () => agent?.access() ?? readAgentAccess(app.getPath('userData')),
+      setAgentAccess: (access) => {
+        agent?.setAccess(access)
+        exposeToUiAutomation()
       },
       quit: () => app.quit()
     })
@@ -170,7 +221,21 @@ if (!app.requestSingleInstanceLock()) {
         }).show()
       }
     })
-    registerApi(createApi(db, scheduler, reminders, showSignedOut, showEvent), devUrl)
+    const api = createApi(db, scheduler, reminders, showSignedOut, showEvent)
+    registerApi(api, devUrl)
+    agent = startAgent({
+      api,
+      dir: app.getPath('userData'),
+      cli,
+      version: app.getVersion(),
+      getEvent: (eventId) => getEvent(db, eventId),
+      command: agentCommand,
+      press: pressKey,
+      screenshot,
+      track: trackWrite
+    })
+    exposeToUiAutomation()
+    app.on('quit', () => agent?.stop())
     reminders.check()
     createMainWindow(!process.argv.includes(HIDDEN_ARG))
     // Every toast is a sign-in notice. This also gets clicks from the Notification Center and from an earlier app run,

@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { Api } from '../shared/api'
 import { registerApi, writesDone } from './ipc'
 
-const ipc = vi.hoisted(() => ({ handle: vi.fn() }))
+const ipc = vi.hoisted(() => ({ handle: vi.fn(), on: vi.fn() }))
 vi.mock('electron', () => ({ ipcMain: ipc, BrowserWindow: { getAllWindows: () => [] } }))
 
 // Calls one Api method the way our page does, from the dev origin.

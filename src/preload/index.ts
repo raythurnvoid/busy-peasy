@@ -49,5 +49,17 @@ contextBridge.exposeInMainWorld('api', {
     const listener = (_: IpcRendererEvent, event: CalendarEvent): void => callback(event)
     ipcRenderer.on('show-event', listener)
     return () => ipcRenderer.off('show-event', listener)
+  },
+  // An agent command from main/agent.ts. The answer, or the error's message, goes back to main.
+  onAgentCommand(callback: (name: string, args: Record<string, unknown>) => Promise<unknown>): () => void {
+    const listener = (_: IpcRendererEvent, id: number, name: string, args: Record<string, unknown>): void =>
+      void callback(name, args).then(
+        (result) => ipcRenderer.send('agent-reply', id, { result }),
+        (e: unknown) => ipcRenderer.send('agent-reply', id, { error: e instanceof Error ? e.message : String(e) })
+      )
+    ipcRenderer.on('agent-command', listener)
+    // Main holds commands until this: right after a start, the page is not listening yet.
+    ipcRenderer.send('agent-ready')
+    return () => ipcRenderer.off('agent-command', listener)
   }
 })

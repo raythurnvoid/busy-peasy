@@ -1,6 +1,7 @@
 import { app, Menu, nativeImage, Tray } from 'electron'
 import icon from '../../resources/icon.png?asset'
 import type { Account } from '../shared/api'
+import { AGENT_ACCESS_LABELS, type AgentAccess } from './agent'
 
 // Passed by the login item, so a start with Windows goes straight to the tray.
 export const HIDDEN_ARG = '--hidden'
@@ -9,12 +10,14 @@ export const HIDDEN_ARG = '--hidden'
 let tray: Tray | null = null
 
 // showSignedOut shows the accounts that need a sign-in: a menu item for each, and a note in the tooltip.
-// showUpdate adds a restart item for a downloaded update.
+// showUpdate adds a restart item for a downloaded update. Agent access: only here, never from the page (main/agent.ts).
 export function createTray(actions: {
   open(): void
   signIn(accountId: number): void
   syncNow(): void
   update(): void
+  agentAccess(): AgentAccess
+  setAgentAccess(access: AgentAccess): void
   quit(): void
 }): { showSignedOut(signedOut: Account[]): void; showUpdate(version: string): void } {
   tray = new Tray(nativeImage.createFromPath(icon).resize({ width: 16, height: 16 }))
@@ -28,6 +31,15 @@ export function createTray(actions: {
       ...(signedOut.length ? [{ type: 'separator' as const }] : []),
       { label: 'Open Busy Peasy', click: actions.open },
       { label: 'Sync now', click: actions.syncNow },
+      {
+        label: 'Agent access',
+        submenu: (['off', 'read', 'full'] as const).map((access) => ({
+          label: AGENT_ACCESS_LABELS[access],
+          type: 'radio' as const,
+          checked: actions.agentAccess() === access,
+          click: () => actions.setAgentAccess(access)
+        }))
+      },
       { type: 'separator' },
       {
         label: 'Start at login',
