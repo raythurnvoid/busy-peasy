@@ -455,6 +455,7 @@
 {/snippet}
 
 <dialog
+  class="pz-panel"
   bind:this={dialog}
   aria-labelledby="event-dialog-title"
   oncancel={(e) => {
@@ -756,10 +757,8 @@
   dialog {
     width: min(45rem, calc(100vw - 2rem));
     padding: 1.5rem;
-    border: 0;
-    border-radius: 1.75rem;
-    background: var(--surface-container);
     color: var(--on-surface);
+    box-shadow: var(--shadow-float);
   }
 
   /* Flex only while open: a closed dialog must stay hidden. */
@@ -769,7 +768,7 @@
   }
 
   dialog::backdrop {
-    background: rgb(0 0 0 / 32%);
+    background: rgb(30 20 10 / 40%);
   }
 
   form {
@@ -816,7 +815,7 @@
   textarea {
     padding: 0.5rem 0.75rem;
     border: 1px solid var(--outline);
-    border-radius: 0.25rem;
+    border-radius: var(--radius);
     background: var(--surface);
     color: inherit;
     font: inherit;

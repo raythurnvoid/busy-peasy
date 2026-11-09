@@ -48,6 +48,7 @@
 <!-- Keys stay in this question: the popover or the edit dialog behind it must not act on Esc, Tab or Ctrl+S. -->
 <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 <dialog
+  class="pz-panel"
   bind:this={dialog}
   aria-labelledby="send-updates-title"
   onkeydown={(e) => e.stopPropagation()}
@@ -80,20 +81,22 @@
   dialog {
     width: min(28rem, calc(100vw - 2rem));
     padding: 1.5rem;
-    border: 0;
-    border-radius: 1.75rem;
-    background: var(--surface-container);
     color: var(--on-surface);
+    box-shadow: var(--shadow-float);
   }
 
   dialog::backdrop {
-    background: rgb(0 0 0 / 32%);
+    background: rgb(30 20 10 / 40%);
   }
 
+  /* A whole question, so the reading face, not Cinzel caps. */
   h2 {
     margin: 0 0 1rem;
+    font-family: var(--font);
+    font-size-adjust: inherit;
     font-size: 1.125rem;
-    font-weight: 400;
+    font-weight: 500;
+    letter-spacing: normal;
   }
 
   p {

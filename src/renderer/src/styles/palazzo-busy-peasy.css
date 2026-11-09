@@ -1,0 +1,72 @@
+/* Palazzo, Busy Peasy variant. Load after palazzo-core.css.
+   The components use Google Calendar's Material 3 token names. Here they point at stone, so dark mode keeps following
+   prefers-color-scheme with no second list of colors.
+   Signature motifs, all in the frame or as state, never as ornaments in content:
+   - A carved stone calendar (Fasti) header: the period title in Cinzel between .pz-title-rule lines (App.svelte).
+   - Cinzel .pz-time hours in the week grid, and a sundial "now" line with a gnomon (WeekView.svelte).
+   - Event chips as flat 2px inlay tiles, in the exact Google and Outlook colors (EventChip, MonthView).
+   - Today's date stays a round medallion.
+   - The reminder as a stone tablet (.pz-panel, Reminder.svelte).
+   - The moulding under the top bar and an Ionic column beside the sidebar (App.svelte). */
+
+:root {
+  --primary: var(--accent-ink);
+  --on-primary: #fff;
+  --primary-container: var(--accent-wash);
+  --on-primary-container: var(--accent-ink);
+  --surface: var(--stone-2);
+  --surface-low: var(--stone-1);
+  --surface-container: var(--stone-2);
+  --surface-high: var(--stone-3);
+  --surface-highest: color-mix(in oklab, var(--line) 60%, var(--stone-3));
+  --on-surface: var(--ink);
+  --on-surface-variant: var(--ink-muted);
+  /* Input and button borders: darker than --line, so fields still show (3:1 on stone). */
+  --outline: color-mix(in oklab, var(--line) 45%, var(--ink-muted));
+  --outline-variant: var(--line);
+  --secondary-container: var(--accent-wash);
+  --error: var(--danger);
+  --accepted: var(--laurel);
+  --declined: var(--danger);
+  --now: var(--accent);
+  --grid-line: var(--line);
+  /* Slightly see-through, so the marble shows under a hovered row. */
+  --hover: color-mix(in oklab, var(--stone-3) 85%, transparent);
+  --font: var(--font-family-sans);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    /* --accent-ink is light orange here, so text on it is dark. */
+    --on-primary: var(--stone-1);
+  }
+}
+
+/* The Fasti title: the period, carved between two title rules. */
+.pz-fasti {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-width: 0;
+  font-family: var(--font-family-display);
+  font-size-adjust: none;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+}
+
+.pz-fasti > span:not(.pz-title-rule) {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Cinzel caps for short labels on buttons. */
+.pz-label {
+  font-family: var(--font-family-display);
+  font-size-adjust: none;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}

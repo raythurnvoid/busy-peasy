@@ -153,14 +153,16 @@
     display: flex;
     align-items: flex-start;
     padding: 0.5rem 1rem;
-    border-bottom: 1px solid var(--outline-variant);
+    border-bottom: 1px solid var(--line);
   }
 
+  /* Room for "NOV 2026, MON" (search shows the year) in Cinzel caps, which are wider than a sans. */
   .date {
     flex: none;
-    width: 8.5rem;
+    width: 9.75rem;
     margin: 0;
     font: inherit;
+    letter-spacing: normal;
   }
 
   .day-btn {
@@ -169,7 +171,7 @@
     gap: 0.5rem;
     padding: 0 0.5rem 0 0;
     border: 0;
-    border-radius: 1.25rem;
+    border-radius: var(--radius);
     background: transparent;
     cursor: pointer;
   }
@@ -184,7 +186,9 @@
     width: 2.5rem;
     height: 2.5rem;
     border-radius: 50%;
-    font-size: 1.375rem;
+    font-family: var(--font-family-display);
+    font-size-adjust: none;
+    font-size: 1.25rem;
   }
 
   .num.today {
@@ -193,8 +197,11 @@
   }
 
   .label {
+    font-family: var(--font-family-display);
+    font-size-adjust: none;
     font-size: 0.6875rem;
-    font-weight: 500;
+    font-weight: 600;
+    letter-spacing: 0.06em;
     text-transform: uppercase;
     white-space: nowrap;
     color: var(--on-surface-variant);
@@ -213,7 +220,7 @@
     height: 2.5rem;
     padding: 0 0.75rem;
     border: 0;
-    border-radius: 0.5rem;
+    border-radius: var(--radius);
     background: transparent;
     text-align: left;
     cursor: pointer;

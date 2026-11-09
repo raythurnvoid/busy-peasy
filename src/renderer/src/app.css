@@ -1,52 +1,7 @@
-/* Colors follow Google Calendar's Material 3 tokens. */
+/* Colors, fonts and radius come from Palazzo (styles/palazzo-core.css), mapped onto the Material 3 token names
+   the components use (styles/palazzo-busy-peasy.css). */
 :root {
   color-scheme: light dark;
-  --primary: #0b57d0;
-  --on-primary: #fff;
-  --primary-container: #d3e3fd;
-  --on-primary-container: #0842a0;
-  --surface: #fff;
-  --surface-low: #f8fafd;
-  --surface-container: #f0f4f9;
-  --surface-high: #e9eef6;
-  --surface-highest: #dde3ea;
-  --on-surface: #1f1f1f;
-  --on-surface-variant: #444746;
-  --outline: #747775;
-  --outline-variant: #c4c7c5;
-  --secondary-container: #c2e7ff;
-  --error: #b3261e;
-  --accepted: #188038;
-  --declined: #d93025;
-  --now: #db372d;
-  --grid-line: #dde3ea;
-  --hover: rgb(68 71 70 / 8%);
-  --font: 'Segoe UI Variable', 'Segoe UI', Roboto, system-ui, sans-serif;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --primary: #a8c7fa;
-    --on-primary: #062e6f;
-    --primary-container: #0842a0;
-    --on-primary-container: #d3e3fd;
-    --surface: #131314;
-    --surface-low: #1b1b1b;
-    --surface-container: #1e1f20;
-    --surface-high: #282a2c;
-    --surface-highest: #333537;
-    --on-surface: #e3e3e3;
-    --on-surface-variant: #c4c7c5;
-    --outline: #8e918f;
-    --outline-variant: #444746;
-    --secondary-container: #004a77;
-    --error: #f2b8b5;
-    --accepted: #81c995;
-    --declined: #f28b82;
-    --now: #f28b82;
-    --grid-line: #333537;
-    --hover: rgb(227 227 227 / 8%);
-  }
 }
 
 *,
@@ -66,6 +21,8 @@ body {
   color: var(--on-surface);
   font-family: var(--font);
   font-size: 0.875rem;
+  /* Native checkboxes and radios in Palazzo orange, not the browser's blue. */
+  accent-color: var(--accent);
   -webkit-font-smoothing: antialiased;
   overflow: hidden;
 }
@@ -80,7 +37,7 @@ button {
 }
 
 :focus-visible {
-  outline: 2px solid var(--primary);
+  outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
 
@@ -105,7 +62,7 @@ body[data-drag='ns-resize'] * {
   white-space: nowrap;
 }
 
-/* Round 40px icon button, used across the app. */
+/* 40px icon button, used across the app. Cut stone like the rest; only toggles and the today medallion stay round. */
 .icon-btn {
   display: inline-grid;
   place-items: center;
@@ -113,7 +70,7 @@ body[data-drag='ns-resize'] * {
   height: 2.5rem;
   padding: 0;
   border: 0;
-  border-radius: 50%;
+  border-radius: var(--radius);
   background: transparent;
   color: var(--on-surface-variant);
   cursor: pointer;
@@ -121,6 +78,7 @@ body[data-drag='ns-resize'] * {
 
 .icon-btn:hover {
   background: var(--hover);
+  color: var(--on-surface);
 }
 
 .icon-btn svg {
@@ -129,31 +87,71 @@ body[data-drag='ns-resize'] * {
   fill: currentColor;
 }
 
-/* Outlined pill button ("Today", view switcher). */
+/* Button labels are short Cinzel caps (Palazzo rule 1). */
+.pill-btn,
+.filled-btn,
+.text-btn {
+  border-radius: var(--radius);
+  font-family: var(--font-family-display);
+  font-size-adjust: none;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background-color 0.15s,
+    border-color 0.15s,
+    box-shadow 0.15s,
+    color 0.15s,
+    transform 0.08s;
+}
+
+/* Outline button ("Today", "Snooze"): stone with a darker bottom edge. Hover takes the accent wash, like an active
+   item; pressed sinks in. */
 .pill-btn {
   height: 2.5rem;
-  padding: 0 1.5rem;
-  border: 1px solid var(--outline);
-  border-radius: 1.25rem;
-  background: transparent;
-  font-weight: 500;
-  cursor: pointer;
+  padding: 0 1rem;
+  border: 1px solid var(--line);
+  background: var(--stone-3);
+  color: var(--ink);
+  box-shadow: inset 0 -1px 0 var(--button-lip);
 }
 
-.pill-btn:hover {
-  background: var(--hover);
+.pill-btn:hover:not(:disabled) {
+  background: var(--accent-wash);
+  border-color: color-mix(in oklab, var(--accent) 60%, var(--line));
 }
 
-/* Filled primary pill ("Save", "Join meeting"). */
+.pill-btn:active:not(:disabled) {
+  background: var(--accent-wash-deep);
+  border-color: color-mix(in oklab, var(--accent) 75%, var(--line));
+  box-shadow: inset 0 2px 3px var(--button-press);
+  transform: translateY(1px);
+}
+
+/* Primary button ("Save", "Join"): one per view, deep orange with white text in both themes. */
 .filled-btn {
   height: 2.25rem;
-  padding: 0 1.5rem;
+  padding: 0 1.25rem;
   border: 0;
-  border-radius: 1.125rem;
-  background: var(--primary);
-  color: var(--on-primary);
-  font-weight: 500;
-  cursor: pointer;
+  background: var(--accent-deep);
+  color: #fff;
+  box-shadow: inset 0 -2px 0 var(--button-lip);
+}
+
+.filled-btn:hover:not(:disabled) {
+  background: var(--accent-deep-hover);
+  box-shadow:
+    inset 0 -2px 0 var(--button-lip),
+    0 4px 12px -4px color-mix(in oklab, var(--accent-deep) 90%, transparent);
+}
+
+.filled-btn:active:not(:disabled) {
+  background: var(--accent-deep-press);
+  box-shadow: inset 0 2px 3px var(--button-press);
+  transform: translateY(1px);
 }
 
 .filled-btn:disabled {
@@ -161,20 +159,24 @@ body[data-drag='ns-resize'] * {
   cursor: default;
 }
 
-/* Google's text button ("More options", "Time zone"). */
+/* Text button ("More options", "Time zone"): orange text, no fill. */
 .text-btn {
   height: 2.25rem;
   padding: 0 0.75rem;
   border: 0;
-  border-radius: 1.125rem;
   background: transparent;
-  color: var(--primary);
-  font-weight: 500;
-  cursor: pointer;
+  color: var(--accent-ink);
 }
 
 .text-btn:hover:not(:disabled) {
   background: var(--hover);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pill-btn:active,
+  .filled-btn:active {
+    transform: none;
+  }
 }
 
 @media (forced-colors: active) {

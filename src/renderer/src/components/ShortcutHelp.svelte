@@ -52,7 +52,7 @@
 </script>
 
 <!-- Esc and Close close it while it is still in the page, so focus goes back to where it was. -->
-<dialog bind:this={dialog} aria-labelledby="help-title" {onclose}>
+<dialog class="pz-panel" bind:this={dialog} aria-labelledby="help-title" {onclose}>
   <div class="head">
     <h2 id="help-title">Keyboard shortcuts</h2>
     <!-- svelte-ignore a11y_autofocus -->
@@ -86,14 +86,12 @@
     width: min(37.5rem, calc(100vw - 2rem));
     max-height: calc(100vh - 2rem);
     padding: 1rem 1.5rem 1.5rem;
-    border: 0;
-    border-radius: 1.75rem;
-    background: var(--surface-container);
     color: var(--on-surface);
+    box-shadow: var(--shadow-float);
   }
 
   dialog::backdrop {
-    background: rgb(0 0 0 / 32%);
+    background: rgb(30 20 10 / 40%);
   }
 
   .head {
@@ -136,7 +134,7 @@
     margin-left: 0.25rem;
     padding: 0 0.25rem;
     border: 1px solid var(--outline);
-    border-radius: 0.25rem;
+    border-radius: var(--radius);
     font-family: inherit;
     text-align: center;
     color: var(--on-surface);

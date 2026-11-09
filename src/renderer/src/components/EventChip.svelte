@@ -72,13 +72,14 @@
 </button>
 
 <style>
+  /* A flat inlay tile (Palazzo): 2px corners, no shadow, no ornament. The fill is the exact Google or Outlook color. */
   .chip {
     display: block;
     width: 100%;
     height: 100%;
     padding: 0.25rem 0.5rem;
     border: 0;
-    border-radius: 0.375rem;
+    border-radius: var(--radius);
     background: var(--c);
     color: var(--on-c);
     font-size: 0.75rem;
@@ -98,7 +99,7 @@
   }
 
   .title {
-    font-weight: 500;
+    font-weight: 600;
     overflow: hidden;
     text-overflow: ellipsis;
   }

@@ -135,7 +135,7 @@
     min-height: 2.5rem;
     padding: 0 1rem;
     border: 0;
-    border-radius: 1.25rem;
+    border-radius: var(--radius);
     background: none;
     color: inherit;
     font: inherit;
@@ -145,13 +145,13 @@
 
   .item:hover,
   .item:focus-visible {
-    background: color-mix(in srgb, var(--on-surface) 8%, transparent);
+    background: var(--hover);
   }
 
   .line {
     height: 1px;
     margin: 0.25rem 0;
-    background: var(--outline);
+    background: var(--line);
   }
 
   /* 9 per row, like Google's right-click menu. */

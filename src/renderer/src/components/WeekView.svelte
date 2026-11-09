@@ -354,10 +354,10 @@
     <div class="body" role="row" style:--hour="{hourPx}px" bind:this={body}>
       <div class="gutter hours" aria-hidden="true">
         {#each secondaryLabels as label, h (h)}
-          <span class="hour-label second" style:top="{h * hourPx}px">{label}</span>
+          <span class="hour-label pz-time second" style:top="{h * hourPx}px">{label}</span>
         {/each}
         {#each formats.hourLabels as label, h (h)}
-          <span class="hour-label" style:top="{h * hourPx}px">{label}</span>
+          <span class="hour-label pz-time" style:top="{h * hourPx}px">{label}</span>
         {/each}
       </div>
       {#each days as day, i (day.getTime())}
@@ -481,9 +481,11 @@
   }
 
   .weekday {
+    font-family: var(--font-family-display);
+    font-size-adjust: none;
     font-size: 0.6875rem;
-    font-weight: 500;
-    letter-spacing: 0.05em;
+    font-weight: 600;
+    letter-spacing: 0.12em;
     text-transform: uppercase;
     color: var(--on-surface-variant);
   }
@@ -494,11 +496,13 @@
     width: 2.875rem;
     height: 2.875rem;
     border-radius: 50%;
-    font-size: 1.625rem;
+    font-family: var(--font-family-display);
+    font-size-adjust: none;
+    font-size: 1.5rem;
   }
 
   .today .weekday {
-    color: var(--primary);
+    color: var(--accent-ink);
   }
 
   .today .date {
@@ -567,10 +571,10 @@
     margin-right: 0.5rem;
     padding: 0 0.5rem;
     border: 0;
-    border-radius: 0.375rem;
+    border-radius: var(--radius);
     background: transparent;
     font-size: 0.75rem;
-    font-weight: 500;
+    font-weight: 600;
     text-align: left;
     white-space: nowrap;
     cursor: pointer;
@@ -596,14 +600,14 @@
     position: relative;
   }
 
+  /* Cinzel hours, like the ledger times of Palazzo. */
   .hour-label {
     position: absolute;
     right: 0.5rem;
     transform: translateY(-50%);
     font-size: 0.6875rem;
-    font-weight: 500;
     line-height: 1rem;
-    color: var(--on-surface-variant);
+    white-space: nowrap;
   }
 
   .hour-label.second {
@@ -631,11 +635,8 @@
   .copy {
     z-index: 2;
     pointer-events: none;
-    border-radius: 0.375rem;
-    box-shadow:
-      0 6px 10px rgb(0 0 0 / 14%),
-      0 1px 18px rgb(0 0 0 / 12%),
-      0 3px 5px rgb(0 0 0 / 20%);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-float);
   }
 
   .box.copy {
@@ -652,6 +653,7 @@
     cursor: ns-resize;
   }
 
+  /* A sundial's shadow line: the gnomon, a small wedge at the day's edge, casts it across the hours. */
   .now {
     position: absolute;
     left: -1px;
@@ -666,12 +668,12 @@
   .now::before {
     content: '';
     position: absolute;
-    left: -6px;
+    left: 0;
     top: -5px;
-    width: 12px;
+    width: 9px;
     height: 12px;
-    border-radius: 50%;
     background: var(--now);
+    clip-path: polygon(0 0, 100% 50%, 0 100%);
   }
 
   @media (forced-colors: active) {

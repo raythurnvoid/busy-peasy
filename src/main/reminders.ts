@@ -66,8 +66,8 @@ export function startReminders(db: Db, devUrl: string | undefined): ReminderSche
       skipTaskbar: true,
       alwaysOnTop: true,
       title: 'Busy Peasy reminder',
-      // Same as --surface in app.css (the card), so no white flash.
-      backgroundColor: nativeTheme.shouldUseDarkColors ? '#131314' : '#ffffff',
+      // Same as --stone-2 in renderer/src/styles/palazzo-core.css (the card), so no white flash.
+      backgroundColor: nativeTheme.shouldUseDarkColors ? '#251c15' : '#fcf8f1',
       webPreferences: {
         preload: join(__dirname, '../preload/index.js'),
         sandbox: true,

@@ -159,7 +159,7 @@
 {/snippet}
 
 {#if kind === 'alert'}
-  <div class="card alert" class:started role="alertdialog" aria-labelledby="reminder-title" tabindex="-1">
+  <div class="card pz-panel alert" class:started role="alertdialog" aria-labelledby="reminder-title" tabindex="-1">
     <header>
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22a2 2 0 0 0 2-2h-4a2 2 0 0 0 2 2m6-6v-5c0-3.1-1.6-5.6-4.5-6.3V4a1.5 1.5 0 0 0-3 0v.7C7.6 5.4 6 7.9 6 11v5l-2 2v1h16v-1z" /></svg>
       <!-- All-day alarms come days or hours ahead: the row says when. With one in the list, "Starting soon" would be wrong. -->
@@ -190,7 +190,7 @@
     {@render extra()}
   </div>
 {:else}
-  <div class="card heads-up" role="status">
+  <div class="card pz-panel heads-up" role="status">
     {#each list.slice(0, MAX_ROWS) as r (r.eventId)}
       {@const snooze = early(r) ? 'until 1 min before start' : '5 minutes'}
       <div class="heads-up-row">
@@ -217,12 +217,12 @@
 {/if}
 
 <style>
-  /* An inset outline, not a border, so it takes no space from the sized rows. */
+  /* A stone tablet (.pz-panel). An inset outline, not its border, so it takes no space from the sized rows. */
   .card {
     height: 100%;
+    border: 0;
     outline: 1px solid var(--outline-variant);
     outline-offset: -1px;
-    background: var(--surface);
     overflow: hidden;
   }
 
@@ -329,7 +329,7 @@
   }
 
   .heads-up .title {
-    font-weight: 500;
+    font-weight: 600;
   }
 
   /* Alert: 3.5rem header plus 1.25rem padding top and bottom, 7.5rem rows. */
@@ -344,13 +344,24 @@
     height: 3.5rem;
     margin-bottom: 1.25rem;
     padding: 0 1.25rem;
-    background: var(--primary-container);
-    color: var(--on-primary-container);
+    border-bottom: 1px solid var(--line);
+    background: var(--surface-high);
+    color: var(--on-surface);
   }
 
+  header svg {
+    color: var(--accent-ink);
+  }
+
+  /* Started: the error wash of Palazzo, not a solid red band. The border sits inside the fixed 3.5rem. */
   .started header {
-    background: var(--error);
-    color: var(--surface);
+    border-bottom-color: color-mix(in oklab, var(--danger) 30%, var(--line));
+    background: var(--danger-wash);
+    color: var(--danger);
+  }
+
+  .started header svg {
+    color: inherit;
   }
 
   header svg {
@@ -362,7 +373,9 @@
   h1 {
     margin: 0;
     font-size: 1rem;
-    font-weight: 500;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
   }
 
   /* Rows: label, title, sub, buttons. */
@@ -381,9 +394,14 @@
 
   .label {
     height: 1.25rem;
-    color: var(--primary);
-    font-size: 0.8125rem;
-    font-weight: 500;
+    color: var(--accent-ink);
+    font-family: var(--font-family-display);
+    font-size-adjust: none;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    line-height: 1.25rem;
+    text-transform: uppercase;
   }
 
   .label.late {
@@ -393,6 +411,7 @@
   .alert .title {
     height: 1.75rem;
     font-size: 1.375rem;
+    font-weight: 500;
     line-height: 1.75rem;
   }
 
@@ -419,7 +438,7 @@
     height: 2.25rem;
     padding: 0 0.75rem;
     border: 1px solid var(--outline);
-    border-radius: 1.125rem;
+    border-radius: var(--radius);
     background: var(--surface);
     color: inherit;
     font: inherit;

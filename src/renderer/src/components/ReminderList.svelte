@@ -115,7 +115,7 @@
     height: 2.25rem;
     padding: 0 0.5rem;
     border: 1px solid var(--outline);
-    border-radius: 0.25rem;
+    border-radius: var(--radius);
     background: var(--surface);
     color: inherit;
     font: inherit;

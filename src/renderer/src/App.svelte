@@ -891,7 +891,14 @@
 <!-- A pending delete is sent before the window goes away. -->
 <svelte:window onkeydown={onKey} onpagehide={commitDelete} />
 
-<div class="shell">
+<div class="shell pz-shell">
+  <!-- Palazzo frame: an Ionic column beside the sidebar and a moulding under the top bar. Never inside the content. -->
+  <div class="pz-column column" aria-hidden="true">
+    <div class="pz-ornament pz-column-capital"></div>
+    <div class="pz-ornament pz-column-shaft"></div>
+    <div class="pz-ornament pz-column-base"></div>
+  </div>
+  <div class="pz-ornament pz-moulding moulding" aria-hidden="true"></div>
   <header class="top">
     {#if search}
       <button class="icon-btn" aria-label="Go back" title="Go back" onclick={closeSearch}>
@@ -952,10 +959,13 @@
       <button class="icon-btn" aria-label="Next {view === 'schedule' ? 'day' : view}" title="Next (j)" onclick={() => step(1)}>
         <svg viewBox="0 0 24 24"><path d="M8.6 16.6 10 18l6-6-6-6-1.4 1.4 4.6 4.6z" /></svg>
       </button>
-      <h1 class="title" aria-live="polite">{title}</h1>
+      <!-- Like a carved stone calendar (Fasti): the period between two title rules. -->
+      <h1 class="title pz-fasti" aria-live="polite">
+        <span class="pz-title-rule"></span><span>{title}</span><span class="pz-title-rule"></span>
+      </h1>
       <div class="views" role="group" aria-label="View">
         {#each VIEWS as v (v.id)}
-          <button class="view-btn" aria-pressed={view === v.id} title="{v.label} ({v.key})" onclick={() => setView(v.id)}>
+          <button class="view-btn pz-label" aria-pressed={view === v.id} title="{v.label} ({v.key})" onclick={() => setView(v.id)}>
             {v.label}
           </button>
         {/each}
@@ -982,7 +992,7 @@
     oncreate={createFromKeyboard}
   />
 
-  <main class="card">
+  <main class="card pz-panel">
     {#each signedOut as account (account.id)}
       <div class="banner" role="alert">
         <span>
@@ -1209,10 +1219,10 @@
 
 {#if toast}
   <!-- Read by the live region above. Every toast has Close, like Google; some have no timer (errors). -->
-  <div class="toast">
+  <div class="toast pz-panel">
     <span>{toast.text}</span>
     {#if toast.undo}
-      <button class="toast-btn" onclick={toast.undo}>Undo</button>
+      <button class="toast-btn pz-label" onclick={toast.undo}>Undo</button>
     {/if}
     <button class="toast-btn close" aria-label="Close" onclick={() => (toast = null)}>
       <svg viewBox="0 0 24 24"><path d="M19 6.4 17.6 5 12 10.6 6.4 5 5 6.4l5.6 5.6L5 17.6 6.4 19l5.6-5.6 5.6 5.6 1.4-1.4-5.6-5.6z" /></svg>
@@ -1221,14 +1231,36 @@
 {/if}
 
 <style>
+  /* The middle 2rem track holds the column, so it never covers the sidebar or the card. */
   .shell {
+    position: relative;
     display: grid;
-    grid-template-columns: 16rem minmax(0, 1fr);
+    grid-template-columns: 16rem 2rem minmax(0, 1fr);
     grid-template-rows: 4rem minmax(0, 1fr);
     height: 100%;
   }
 
+  /* Absolute in its grid area, beside the card from top to bottom. Not in the top bar: in a narrow window the bar's
+     buttons slide over this track. Both lines set: on an absolute item, an auto end line means the grid's far edge. */
+  .column {
+    grid-column: 2 / 3;
+    grid-row: 2 / 3;
+    bottom: 1rem;
+    inset-inline-end: 2px;
+  }
+
+  /* The top bar's bottom edge, as wide as the card below it. Its buttons are centered, so it covers none of them. */
+  .moulding {
+    grid-column: 3;
+    grid-row: 1;
+    align-self: end;
+    margin: 0 1rem 0.375rem 0;
+    pointer-events: none;
+  }
+
+  /* Rows set by hand: the moulding shares row 1, so auto placement would push the bar down. */
   .top {
+    grid-row: 1;
     grid-column: 1 / -1;
     display: flex;
     align-items: center;
@@ -1236,10 +1268,17 @@
     padding: 0 1rem;
   }
 
+  /* Wide enough that Today starts above the card. In a narrow window it shrinks and wraps first. */
   .brand {
-    width: 14rem;
-    font-size: 1.375rem;
-    color: var(--on-surface-variant);
+    width: 16.75rem;
+    line-height: 1.2;
+    font-family: var(--font-family-display);
+    font-size-adjust: none;
+    font-size: 1.125rem;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--on-surface);
   }
 
   .top .pill-btn {
@@ -1248,7 +1287,7 @@
 
   /* After the back button, so the box still starts above the card, like Google. */
   .search-title {
-    width: 11.5rem;
+    width: 13.5rem;
     margin: 0;
     font-weight: 400;
   }
@@ -1262,7 +1301,8 @@
     height: 3rem;
     margin-right: auto;
     padding: 0 0.25rem 0 1rem;
-    border-radius: 1.5rem;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
     background: var(--surface);
   }
 
@@ -1287,52 +1327,57 @@
 
   /* The box has no outline of its own, so the pill shows focus. */
   .search:focus-within {
-    outline: 2px solid var(--primary);
+    outline: 2px solid var(--accent);
   }
 
+  /* Cuts the title and its rules in a narrow window, so they never run over the view buttons. */
   .title {
     flex: 1;
-    margin: 0 0 0 0.5rem;
-    font-size: 1.375rem;
-    font-weight: 400;
+    margin: 0 0 0 0.75rem;
+    font-size: 1.25rem;
     line-height: 1.75rem;
-    white-space: nowrap;
     overflow: hidden;
-    text-overflow: ellipsis;
   }
 
+  /* Never squeezed: Cinzel labels are wide, and a cut view button is unusable. */
   .views {
+    flex: none;
     display: flex;
     margin-right: 0.5rem;
-    border: 1px solid var(--outline);
-    border-radius: 1.25rem;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--surface);
     overflow: hidden;
   }
 
   .view-btn {
     height: 2.375rem;
-    padding: 0 1rem;
+    padding: 0 0.875rem;
     border: 0;
     background: transparent;
-    font-weight: 500;
+    color: var(--on-surface-variant);
     cursor: pointer;
   }
 
   .view-btn:hover {
     background: var(--hover);
+    color: var(--on-surface);
   }
 
+  /* Active: the accent wash with a full outline, never a bar on one side. */
   .view-btn[aria-pressed='true'] {
-    background: var(--secondary-container);
+    background: var(--accent-wash);
+    color: var(--accent-ink);
+    box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--accent) 45%, var(--accent-wash));
   }
 
   .card {
     display: flex;
     flex-direction: column;
+    grid-row: 2;
+    grid-column: 3;
     margin: 0 1rem 1rem 0;
     min-height: 0;
-    border-radius: 1.75rem;
-    background: var(--surface);
     overflow: hidden;
   }
 
@@ -1341,16 +1386,13 @@
     align-items: center;
     gap: 1rem;
     padding: 0.75rem 1rem 0.75rem 1.5rem;
-    background: var(--error);
-    color: var(--surface);
+    border-bottom: 1px solid color-mix(in oklab, var(--danger) 30%, var(--line));
+    background: var(--danger-wash);
+    color: var(--danger);
   }
 
   .banner span {
     flex: 1;
-  }
-
-  .banner .pill-btn {
-    border-color: currentColor;
   }
 
   .note-bar {
@@ -1386,10 +1428,8 @@
     min-width: 18rem;
     max-width: min(40rem, calc(100vw - 2rem));
     padding: 0.5rem 0.5rem 0.5rem 1rem;
-    border-radius: 0.25rem;
-    background: var(--on-surface);
-    color: var(--surface);
-    box-shadow: 0 3px 5px rgb(0 0 0 / 20%);
+    color: var(--on-surface);
+    box-shadow: var(--shadow-float);
   }
 
   .toast span {
@@ -1400,11 +1440,14 @@
     height: 2.25rem;
     padding: 0 0.75rem;
     border: 0;
-    border-radius: 0.25rem;
+    border-radius: var(--radius);
     background: transparent;
-    color: var(--primary-container);
-    font-weight: 500;
+    color: var(--accent-ink);
     cursor: pointer;
+  }
+
+  .toast-btn:hover {
+    background: var(--hover);
   }
 
   .close {
@@ -1413,7 +1456,7 @@
     width: 2.25rem;
     padding: 0;
     margin-left: -1rem;
-    color: var(--surface);
+    color: var(--on-surface-variant);
   }
 
   .close svg {

@@ -35,8 +35,9 @@ let flushed = false
 // Set by the tray's restart item: this quit installs the downloaded update and starts the app again.
 let restartToUpdate = false
 
-// Same as --surface-low in app.css, so the window never shows white before the page paints.
-const background = (): string => (nativeTheme.shouldUseDarkColors ? '#1b1b1b' : '#f8fafd')
+// Same as --stone-1 in renderer/src/styles/palazzo-core.css (the shell), so the window never shows white before the
+// page paints.
+const background = (): string => (nativeTheme.shouldUseDarkColors ? '#1c150f' : '#f6efe3')
 
 function createMainWindow(show: boolean): void {
   mainWindow = new BrowserWindow({

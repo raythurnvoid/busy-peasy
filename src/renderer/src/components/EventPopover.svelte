@@ -423,7 +423,7 @@
     width: 0.875rem;
     height: 0.875rem;
     margin-top: 0.5rem;
-    border-radius: 0.25rem;
+    border-radius: var(--radius);
   }
 
   .icon {
@@ -433,10 +433,14 @@
     fill: var(--on-surface-variant);
   }
 
+  /* The event's own title: the reading face, not Cinzel caps. */
   .title {
     margin: 0;
+    font-family: var(--font);
+    font-size-adjust: inherit;
     font-size: 1.375rem;
-    font-weight: 400;
+    font-weight: 500;
+    letter-spacing: normal;
     line-height: 1.75rem;
     overflow-wrap: anywhere;
   }
@@ -459,7 +463,7 @@
 
   .description a,
   .link {
-    color: var(--primary);
+    color: var(--accent-ink);
   }
 
   .plain {
@@ -570,21 +574,21 @@
     gap: 0.5rem;
     margin: 0.5rem -0.5rem -1rem;
     padding: 0.625rem 1rem;
+    border-top: 1px solid var(--line);
     background: var(--surface-high);
   }
 
   /* Google's small pills. */
   .going .pill-btn {
     height: 1.75rem;
-    padding: 0 1rem;
-    border-color: var(--outline-variant);
-    font-size: 0.8125rem;
-    font-weight: 400;
+    padding: 0 0.875rem;
   }
 
+  /* The chosen answer: the accent wash with a full outline, like an active item. */
   .going .pill-btn[aria-pressed='true'] {
-    border-color: transparent;
-    background: var(--secondary-container);
+    border-color: color-mix(in oklab, var(--accent) 60%, var(--line));
+    background: var(--accent-wash);
+    color: var(--accent-ink);
   }
 
   .going fieldset {
@@ -599,7 +603,7 @@
   .going legend {
     margin-bottom: 0.25rem;
     padding: 0;
-    font-weight: 500;
+    font-weight: 600;
   }
 
   .step-actions {

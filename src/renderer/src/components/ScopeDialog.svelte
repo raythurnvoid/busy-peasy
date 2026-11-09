@@ -50,6 +50,7 @@
 <!-- Keys stay in this question: the popover or the edit dialog behind it must not act on Esc, Tab or Ctrl+S. -->
 <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 <dialog
+  class="pz-panel"
   bind:this={dialog}
   aria-labelledby="scope-title"
   onkeydown={(e) => e.stopPropagation()}
@@ -94,15 +95,13 @@
   dialog {
     width: min(24rem, calc(100vw - 2rem));
     padding: 1.5rem;
-    border: 0;
-    border-radius: 1.75rem;
-    background: var(--surface-container);
     color: var(--on-surface);
+    box-shadow: var(--shadow-float);
     accent-color: var(--primary);
   }
 
   dialog::backdrop {
-    background: rgb(0 0 0 / 32%);
+    background: rgb(30 20 10 / 40%);
   }
 
   h2 {

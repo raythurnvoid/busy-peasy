@@ -75,7 +75,7 @@
 
 <div class="backdrop" onpointerdown={onclose} aria-hidden="true"></div>
 <div
-  class="card"
+  class="card pz-panel"
   role="dialog"
   aria-modal="true"
   aria-label={label}
@@ -109,13 +109,8 @@
     max-height: calc(100vh - 1rem);
     overflow-y: auto;
     padding: 0.5rem 0.5rem 1rem;
-    border-radius: 1.75rem;
-    background: var(--surface-container);
     color: var(--on-surface);
-    box-shadow:
-      0 1px 8px rgb(0 0 0 / 20%),
-      0 3px 4px rgb(0 0 0 / 14%),
-      0 3px 3px -2px rgb(0 0 0 / 12%);
+    box-shadow: var(--shadow-float);
   }
 
   .card:focus {

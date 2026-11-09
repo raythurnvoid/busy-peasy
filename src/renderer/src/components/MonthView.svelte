@@ -354,8 +354,11 @@
   .weekdays div {
     padding-top: 0.5rem;
     text-align: center;
+    font-family: var(--font-family-display);
+    font-size-adjust: none;
     font-size: 0.6875rem;
-    font-weight: 500;
+    font-weight: 600;
+    letter-spacing: 0.12em;
     text-transform: uppercase;
     color: var(--on-surface-variant);
     border-left: 1px solid var(--grid-line);
@@ -421,9 +424,9 @@
     margin: 0 0.5rem;
     padding: 0 0.375rem;
     border: 0;
-    border-radius: 0.375rem;
+    border-radius: var(--radius);
     font-size: 0.75rem;
-    font-weight: 500;
+    font-weight: 600;
     line-height: 1.25rem;
     text-align: left;
     white-space: nowrap;
@@ -569,10 +572,7 @@
   /* The copy in the target cell: a light background and a shadow, like Google. */
   .copy {
     pointer-events: none;
-    box-shadow:
-      0 6px 10px rgb(0 0 0 / 14%),
-      0 1px 18px rgb(0 0 0 / 12%),
-      0 3px 5px rgb(0 0 0 / 20%);
+    box-shadow: var(--shadow-float);
   }
 
   .timed.copy {
@@ -584,14 +584,19 @@
   }
 
   .more-weekday {
+    font-family: var(--font-family-display);
+    font-size-adjust: none;
     font-size: 0.6875rem;
-    font-weight: 500;
+    font-weight: 600;
+    letter-spacing: 0.12em;
     text-transform: uppercase;
     color: var(--on-surface-variant);
   }
 
   .more-date {
-    font-size: 1.625rem;
+    font-family: var(--font-family-display);
+    font-size-adjust: none;
+    font-size: 1.5rem;
   }
 
   .more-list {

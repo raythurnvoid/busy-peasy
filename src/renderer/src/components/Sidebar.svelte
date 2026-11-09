@@ -39,7 +39,8 @@
 </script>
 
 <aside class="side">
-  <button class="create" title="Create event (c)" onclick={oncreate}>
+  <!-- The view's one primary button, in the Palazzo deep orange. -->
+  <button class="filled-btn create" title="Create event (c)" onclick={oncreate}>
     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6z" /></svg>
     Create
   </button>
@@ -110,25 +111,14 @@
     gap: 0.75rem;
     height: 3.5rem;
     margin-bottom: 1rem;
-    padding: 0 1.25rem 0 1rem;
-    border: 0;
-    border-radius: 1rem;
-    background: var(--surface);
-    font-weight: 500;
-    box-shadow:
-      0 1px 2px rgb(0 0 0 / 30%),
-      0 1px 3px 1px rgb(0 0 0 / 15%);
-    cursor: pointer;
-  }
-
-  .create:hover {
-    background: var(--surface-container);
+    padding: 0 1.5rem 0 1rem;
+    font-size: 12.5px;
   }
 
   .create svg {
     width: 1.5rem;
     height: 1.5rem;
-    fill: var(--primary);
+    fill: currentColor;
   }
 
   .account {
@@ -140,14 +130,14 @@
   }
 
   .email {
-    font-weight: 500;
+    font-weight: 600;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
   .status {
-    font-size: 0.75rem;
+    font-size: 0.8125rem;
     color: var(--on-surface-variant);
   }
 
@@ -180,19 +170,21 @@
     color: var(--on-surface-variant);
   }
 
+  /* Long Cinzel caps labels ("Add Microsoft 365 account"): smaller and tighter, so they fit the sidebar. */
   .add {
     display: block;
     width: 100%;
     margin-top: 0.5rem;
-    padding: 0 1rem;
-    font-size: 0.8125rem;
+    padding: 0 0.5rem;
+    font-size: 10.5px;
+    letter-spacing: 0.05em;
   }
 
   .small {
     height: 2rem;
     margin-top: 0.25rem;
-    padding: 0 1rem;
-    font-size: 0.8125rem;
+    padding: 0 0.75rem;
+    font-size: 10.5px;
   }
 
   .link-btn {
@@ -200,7 +192,7 @@
     border: 0;
     background: none;
     color: var(--on-surface-variant);
-    font-size: 0.75rem;
+    font-size: 0.8125rem;
     text-decoration: underline;
     cursor: pointer;
   }

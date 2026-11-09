@@ -110,7 +110,11 @@
 
   .title {
     flex: 1;
-    font-weight: 500;
+    font-family: var(--font-family-display);
+    font-size-adjust: none;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
   }
 
   .small {
@@ -136,8 +140,10 @@
   }
 
   .weekday {
+    font-family: var(--font-family-display);
+    font-size-adjust: none;
     font-size: 0.625rem;
-    font-weight: 500;
+    font-weight: 600;
     line-height: 2rem;
     color: var(--on-surface-variant);
   }
@@ -150,7 +156,7 @@
     border: 0;
     border-radius: 50%;
     background: transparent;
-    font-size: 0.625rem;
+    font-size: 0.75rem;
     font-weight: 500;
     cursor: pointer;
   }
@@ -164,8 +170,9 @@
   }
 
   .selected {
-    background: var(--primary-container);
-    color: var(--on-primary-container);
+    background: var(--accent-wash);
+    color: var(--accent-ink);
+    box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--accent) 45%, var(--accent-wash));
   }
 
   .today {

@@ -1,6 +1,6 @@
 {
   "name": "busy-peasy",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "private": true,
   "description": "Local calendar that combines Microsoft 365 and Google calendars, with reminders you can't miss",
   "main": "./out/main/index.js",
@@ -24,6 +24,8 @@
     "@electron-toolkit/eslint-config-prettier": "^3.0.1",
     "@electron-toolkit/eslint-config-ts": "^4.0.0",
     "@electron-toolkit/tsconfig": "^2.0.0",
+    "@fontsource-variable/cinzel": "^5.3.0",
+    "@fontsource-variable/eb-garamond": "^5.3.0",
     "@sveltejs/vite-plugin-svelte": "7.3.1",
     "@types/node": "24.19.2",
     "electron": "45.0.0",

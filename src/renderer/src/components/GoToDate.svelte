@@ -18,7 +18,7 @@
 </script>
 
 <!-- Esc, Cancel and Go close it while it is still in the page, so focus goes back to where it was. -->
-<dialog bind:this={dialog} aria-labelledby="go-to-title" {onclose}>
+<dialog class="pz-panel" bind:this={dialog} aria-labelledby="go-to-title" {onclose}>
   <form
     onsubmit={(e) => {
       e.preventDefault()
@@ -48,14 +48,12 @@
   dialog {
     width: min(20rem, calc(100vw - 2rem));
     padding: 1.5rem;
-    border: 0;
-    border-radius: 1.75rem;
-    background: var(--surface-container);
     color: var(--on-surface);
+    box-shadow: var(--shadow-float);
   }
 
   dialog::backdrop {
-    background: rgb(0 0 0 / 32%);
+    background: rgb(30 20 10 / 40%);
   }
 
   h2 {
@@ -70,7 +68,7 @@
     margin-bottom: 1.5rem;
     padding: 0 0.75rem;
     border: 1px solid var(--outline);
-    border-radius: 0.25rem;
+    border-radius: var(--radius);
     background: transparent;
     color: inherit;
     font: inherit;

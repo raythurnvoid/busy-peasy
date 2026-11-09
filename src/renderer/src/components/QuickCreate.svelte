@@ -87,7 +87,7 @@
 
   .title:focus {
     outline: none;
-    border-bottom: 2px solid var(--primary);
+    border-bottom: 2px solid var(--accent);
   }
 
   .when {
@@ -97,7 +97,7 @@
   select {
     padding: 0.375rem 0.5rem;
     border: 1px solid var(--outline);
-    border-radius: 0.25rem;
+    border-radius: var(--radius);
     background: var(--surface);
     color: inherit;
     font: inherit;

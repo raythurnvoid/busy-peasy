@@ -1,5 +1,10 @@
 import { mount } from 'svelte'
 
+// Bundled, so the fonts work offline and pass the CSP (font-src 'self').
+import '@fontsource-variable/cinzel'
+import '@fontsource-variable/eb-garamond'
+import './styles/palazzo-core.css'
+import './styles/palazzo-busy-peasy.css'
 import './app.css'
 
 import App from './App.svelte'

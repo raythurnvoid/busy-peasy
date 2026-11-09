@@ -243,7 +243,7 @@
   input {
     padding: 0.5rem 0.75rem;
     border: 1px solid var(--outline);
-    border-radius: 0.25rem;
+    border-radius: var(--radius);
     background: var(--surface);
     color: inherit;
     font: inherit;
@@ -268,9 +268,10 @@
     right: 0;
     z-index: 1;
     padding: 0.5rem 0;
-    border-radius: 0.25rem;
+    border-radius: var(--radius);
+    border: 1px solid var(--line);
     background: var(--surface);
-    box-shadow: 0 2px 6px rgb(0 0 0 / 30%);
+    box-shadow: var(--shadow-float);
   }
 
   .suggestions li,
