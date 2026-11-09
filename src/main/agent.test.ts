@@ -1,7 +1,7 @@
 import { execFileSync } from 'node:child_process'
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { request } from 'node:http'
-import { tmpdir } from 'node:os'
+import { tmpdir, userInfo } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Api } from '../shared/api'
@@ -165,13 +165,21 @@ describe('startAgent', () => {
     expect((await call('/v1/help', { method: 'GET' })).status).toBe(200)
   })
 
-  it.runIf(process.platform === 'win32')('lets only this user read the token file', async () => {
-    start('read')
-    await apiFile()
-    const acl = execFileSync('icacls', [join(dir, 'agent-api.json')], { encoding: 'utf8' })
-    // (I): a permission inherited from the folder, like CodexSandboxUsers on %APPDATA%.
-    expect(acl).not.toContain('(I)')
-    // One entry: this user, full control.
-    expect(acl.match(/:\(\w+\)/g)).toEqual([':(F)'])
-  })
+  // %APPDATA% passes its entries down. A bare folder passes nothing down (like the CI temp folder), so the new file
+  // gets its own Administrators and SYSTEM entries.
+  const onWindows = it.runIf(process.platform === 'win32')
+  onWindows.each([false, true])(
+    'only this user can read the token file (bare folder: %s)',
+    async (bare) => {
+      const grant = ['/inheritance:r', '/grant:r', `${userInfo().username}:F`]
+      if (bare) execFileSync('icacls', [dir, ...grant], { stdio: 'ignore' })
+      start('read')
+      await apiFile()
+      const acl = execFileSync('icacls', [join(dir, 'agent-api.json')], { encoding: 'utf8' })
+      // (I): a permission inherited from the folder, like CodexSandboxUsers on %APPDATA%.
+      expect(acl).not.toContain('(I)')
+      // One entry: this user, full control.
+      expect(acl.match(/:\(\w+\)/g)).toEqual([':(F)'])
+    }
+  )
 })

@@ -360,12 +360,15 @@ export function startAgent(o: AgentOptions): { access(): AgentAccess; setAccess(
 
   // Windows ignores the mode, and %APPDATA% can let other accounts read (seen: CodexSandboxUsers), so only this user may
   // read the token. The ACL is set on the empty file, before the token is in it. If that fails, no file: no access.
+  // /reset first: in a folder that passes nothing down, a new file gets its own entries (Administrators, SYSTEM), and
+  // /inheritance:r keeps those.
   const writeApiFile = (): void => {
     const path = join(o.dir, API_FILE)
     const file = { url: `http://127.0.0.1:${port}`, token, access, pid: process.pid, version: o.version, cli: o.cli }
     try {
       writeFileSync(path, '', { mode: 0o600 })
       if (process.platform === 'win32') {
+        execFileSync('icacls', [path, '/reset'], { stdio: 'ignore' })
         execFileSync('icacls', [path, '/inheritance:r', '/grant:r', `${userInfo().username}:F`], { stdio: 'ignore' })
       }
       writeFileSync(path, JSON.stringify(file, null, 2))
