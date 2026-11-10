@@ -162,13 +162,15 @@ function colorChange(db: Db, calendarId: number, key: unknown, record: EventReco
 }
 
 // onAccountRemoved: the tray drops the account's sign-in item; no sync runs to tell it. showEvent: brings up the main
-// window, on the event if it still exists.
+// window, on the event if it still exists. update: the downloaded update (updater.ts), and the tray's restart to
+// install it.
 export function createApi(
   db: Db,
   scheduler: SyncScheduler,
   reminders: ReminderScheduler,
   onAccountRemoved: () => void,
-  showEvent: (event: CalendarEvent | null) => void
+  showEvent: (event: CalendarEvent | null) => void,
+  update: { version(): string | null; install(): void }
 ): Api {
   return {
     listAccounts: async () => listAccounts(db),
@@ -450,6 +452,12 @@ export function createApi(
       nativeTheme.themeSource = theme
       notifyDataChanged({ accounts: false, calendars: false, events: true, reminders: false, settings: true })
       reminders.check()
+    },
+    getUpdate: async () => update.version(),
+    installUpdate: async () => {
+      // With nothing downloaded, the restart would only quit the app.
+      check(update.version() !== null)
+      update.install()
     }
   }
 }

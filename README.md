@@ -89,4 +89,5 @@ tests, use a dev run: `pnpm dev --remoteDebuggingPort 9222`, then `playwriter se
 
 Bump `version` in `package.json`, push, then run the **Release** workflow in GitHub Actions. It publishes the Windows
 installer as a GitHub release. Installed apps download it in the background and install it on the next quit, or right
-away from the tray item "Restart to update".
+away from the banner in the window or the tray item "Restart to update". They check at start and every 4 hours, and
+write what the updater did in this run to `updater.log` in `%APPDATA%\busy-peasy`.

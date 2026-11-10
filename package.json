@@ -1,6 +1,6 @@
 {
   "name": "busy-peasy",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "private": true,
   "description": "Local calendar that combines Microsoft 365 and Google calendars, with reminders you can't miss",
   "main": "./out/main/index.js",

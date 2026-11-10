@@ -32,6 +32,7 @@ let check: () => void
 let onAccountRemoved: () => void
 let showEvent: () => void
 let scheduler: ReminderScheduler
+let update: { version: () => string | null; install: () => void }
 
 beforeEach(() => {
   db = openDb(':memory:')
@@ -40,7 +41,8 @@ beforeEach(() => {
   onAccountRemoved = vi.fn()
   showEvent = vi.fn()
   scheduler = { check, list: vi.fn(), answer: vi.fn(), dismiss: vi.fn() }
-  api = createApi(db, { syncNow, syncAccount: vi.fn(async () => {}) }, scheduler, onAccountRemoved, showEvent)
+  update = { version: vi.fn(() => null), install: vi.fn() }
+  api = createApi(db, { syncNow, syncAccount: vi.fn(async () => {}) }, scheduler, onAccountRemoved, showEvent, update)
   defaults = getSettings(db)
   nativeTheme.themeSource = 'system'
   vi.mocked(notifyDataChanged).mockClear()
@@ -463,7 +465,7 @@ describe('event writes', () => {
     const id = stored({ recurringEventId: 's1' })
     // The sync brings the series as the provider has it now.
     const syncAccount = vi.fn(async () => void db.prepare('UPDATE events SET title = ? WHERE id = ?').run('Synced', id))
-    api = createApi(db, { syncNow, syncAccount }, { check, list: vi.fn(), answer: vi.fn(), dismiss: vi.fn() }, onAccountRemoved, showEvent)
+    api = createApi(db, { syncNow, syncAccount }, { check, list: vi.fn(), answer: vi.fn(), dismiss: vi.fn() }, onAccountRemoved, showEvent, update)
     vi.mocked(updateEvent).mockClear().mockResolvedValue(null)
     await expect(api.updateEvent(id, { repeat: { ...weekly, extra: 1 } as never }, { scope: 'following' })).resolves.toMatchObject({ title: 'Synced' })
     expect(syncAccount).toHaveBeenCalledWith(1)
@@ -642,5 +644,16 @@ describe('respondEvent', () => {
     vi.mocked(respondEvent).mockRejectedValue(new Error('Failed'))
     await expect(api.respondEvent(id, 'declined', 'event')).rejects.toThrow('Failed')
     expect(syncNow).toHaveBeenCalledTimes(2)
+  })
+})
+
+describe('installUpdate', () => {
+  it('restarts only with a downloaded update: else it would just quit the app', async () => {
+    await expect(api.installUpdate()).rejects.toThrow('Invalid arguments')
+    expect(update.install).not.toHaveBeenCalled()
+    vi.mocked(update.version).mockReturnValue('0.3.1')
+    await expect(api.getUpdate()).resolves.toBe('0.3.1')
+    await api.installUpdate()
+    expect(update.install).toHaveBeenCalledOnce()
   })
 })

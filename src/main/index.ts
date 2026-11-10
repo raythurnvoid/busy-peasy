@@ -22,7 +22,7 @@ import { startReminders } from './reminders'
 import { appUrl, handleAppProtocol, hardenApp, registerAppScheme } from './security'
 import { createSyncScheduler, type SyncScheduler } from './sync/scheduler'
 import { createTray, enableStartAtLoginOnce, HIDDEN_ARG } from './tray'
-import { installUpdate, startUpdates } from './updater'
+import { downloadedUpdate, installUpdate, startUpdates } from './updater'
 
 const APP_ID = 'bonobo-senate.busypeasy'
 const POLL_INTERVAL = 2 * 60_000
@@ -38,7 +38,8 @@ let agent: ReturnType<typeof startAgent> | undefined
 let lastFocusSync = 0
 let quitting = false
 let flushed = false
-// Set by the tray's restart item: this quit installs the downloaded update and starts the app again.
+// Set by the tray's restart item or the page's update banner: this quit installs the downloaded update and starts the
+// app again.
 let restartToUpdate = false
 
 // Same as --stone-1 in renderer/src/styles/palazzo-core.css (the shell), so the window never shows white before the
@@ -179,14 +180,16 @@ if (!app.requestSingleInstanceLock()) {
     })
     enableStartAtLoginOnce(listAccounts(db).length === 0)
     const reminders = startReminders(db, devUrl)
+    // The tray item and the page's update banner.
+    const restartAndUpdate = (): void => {
+      restartToUpdate = true
+      app.quit()
+    }
     const tray = createTray({
       open: showMainWindow,
       signIn: signInAgain,
       syncNow: () => void scheduler.syncNow(),
-      update: () => {
-        restartToUpdate = true
-        app.quit()
-      },
+      update: restartAndUpdate,
       agentAccess: () => agent?.access() ?? readAgentAccess(app.getPath('userData')),
       setAgentAccess: (access) => {
         agent?.setAccess(access)
@@ -197,7 +200,10 @@ if (!app.requestSingleInstanceLock()) {
     // Also at start and at every poll: a sync run where every account is signed out sends no notify.
     const showSignedOut = (): void => tray.showSignedOut(listAccounts(db).filter((a) => a.status === 'needs-sign-in'))
     showSignedOut()
-    startUpdates(tray.showUpdate)
+    startUpdates((version) => {
+      tray.showUpdate(version)
+      mainWindow?.webContents.send('update-ready', version)
+    })
     scheduler = createSyncScheduler({
       db,
       now: Date.now,
@@ -221,7 +227,10 @@ if (!app.requestSingleInstanceLock()) {
         }).show()
       }
     })
-    const api = createApi(db, scheduler, reminders, showSignedOut, showEvent)
+    const api = createApi(db, scheduler, reminders, showSignedOut, showEvent, {
+      version: downloadedUpdate,
+      install: restartAndUpdate
+    })
     registerApi(api, devUrl)
     agent = startAgent({
       api,

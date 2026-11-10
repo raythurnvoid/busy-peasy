@@ -26,7 +26,9 @@ const names: (keyof Api)[] = [
   'dismissReminders',
   'showEvent',
   'getSettings',
-  'saveSettings'
+  'saveSettings',
+  'getUpdate',
+  'installUpdate'
 ]
 
 const api = Object.fromEntries(names.map((name) => [name, (...args: unknown[]) => ipcRenderer.invoke('api', name, args)]))
@@ -49,6 +51,12 @@ contextBridge.exposeInMainWorld('api', {
     const listener = (_: IpcRendererEvent, event: CalendarEvent): void => callback(event)
     ipcRenderer.on('show-event', listener)
     return () => ipcRenderer.off('show-event', listener)
+  },
+  // An update was downloaded: this version installs on the next quit.
+  onUpdateReady(callback: (version: string) => void): () => void {
+    const listener = (_: IpcRendererEvent, version: string): void => callback(version)
+    ipcRenderer.on('update-ready', listener)
+    return () => ipcRenderer.off('update-ready', listener)
   },
   // An agent command from main/agent.ts. The answer, or the error's message, goes back to main.
   onAgentCommand(callback: (name: string, args: Record<string, unknown>) => Promise<unknown>): () => void {

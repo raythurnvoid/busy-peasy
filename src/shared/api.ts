@@ -293,6 +293,10 @@ export interface Api {
   showEvent(eventId: number): Promise<void>
   getSettings(): Promise<Settings>
   saveSettings(settings: Settings): Promise<void>
+  // The version of a downloaded update that installs on the next quit. null: none.
+  getUpdate(): Promise<string | null>
+  // Quits, installs the downloaded update and starts the app again.
+  installUpdate(): Promise<void>
 }
 
 // Pushed from main when stored data changes. The renderer re-reads what it shows.

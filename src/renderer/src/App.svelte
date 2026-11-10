@@ -139,6 +139,8 @@
   let deleting: number[] = $state([])
   // undo: what the Undo button does. null: no Undo button.
   let toast: { text: string; undo: (() => void) | null } | null = $state(null)
+  // A downloaded update's version, for the update banner. Close hides it until the next download.
+  let appUpdate: string | null = $state(null)
   // Dragged events, shown at their new times while the write runs. They replace the stored copy, so a failed write
   // just drops them.
   let moved: CalendarEvent[] = $state([])
@@ -272,6 +274,13 @@
       const account = signedOut.find((a) => a.id === accountId)
       if (account) signInAgain(account)
     })
+  })
+
+  // Like Only Whispers: a downloaded update installs on quit anyway, and the banner offers a restart now. Asked at the
+  // start too: the update may have come before this page.
+  $effect(() => {
+    void window.api.getUpdate().then((version) => (appUpdate = version))
+    return window.api.onUpdateReady((version) => (appUpdate = version))
   })
 
   // A click on a reminder's text. Not while a dialog or quick create is open, so unsaved work stays: the window only
@@ -1071,6 +1080,23 @@
         </button>
       </div>
     {/each}
+    {#if appUpdate}
+      <div class="banner update" role="status">
+        <span>
+          Busy Peasy {appUpdate} is ready. It installs when you quit, or now with a restart.
+        </span>
+        <button class="pill-btn" onclick={() => void window.api.installUpdate()}>
+          Restart to update
+        </button>
+        <button class="toast-btn close" aria-label="Close" onclick={() => (appUpdate = null)}>
+          <svg viewBox="0 0 24 24"
+            ><path
+              d="M19 6.4 17.6 5 12 10.6 6.4 5 5 6.4l5.6 5.6L5 17.6 6.4 19l5.6-5.6 5.6 5.6 1.4-1.4-5.6-5.6z"
+            /></svg
+          >
+        </button>
+      </div>
+    {/if}
     <!-- Always here, so a screen reader reads the text when it comes. -->
     <div class="note-bar" role="status">{#if outside && synced}Only events from {syncedText(synced)} are synced. Days outside these dates show no events.{/if}</div>
     <div class="sr-only" role="status">{#if colorSaved}Event saved{/if}</div>
@@ -1457,6 +1483,18 @@
 
   .banner span {
     flex: 1;
+  }
+
+  /* Good news, not a problem: the accent instead of the danger colors. */
+  .banner.update {
+    border-bottom-color: color-mix(in oklab, var(--accent) 30%, var(--line));
+    background: var(--accent-wash);
+    color: var(--ink);
+  }
+
+  /* Its close sits at the banner's edge, not pulled in like a toast's. */
+  .banner .close {
+    margin: 0 -0.5rem 0 -0.5rem;
   }
 
   .note-bar {
