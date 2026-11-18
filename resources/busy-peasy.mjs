@@ -141,14 +141,17 @@ function protectTokensFolder() {
 }
 
 // One entry, not inherited (D:P): this user's SID, full control, passed down to the files. icacls /save writes the
-// ACL as SDDL (UTF-16), for example "D:PAI(A;OICI;FA;;;S-1-5-21-...)".
+// ACL as SDDL (UTF-16), for example "D:PAI(A;OICI;FA;;;S-1-5-21-...)". SDDL writes the built-in Administrator (RID
+// 500, the user on GitHub's Windows runners) as "LA", not as its SID.
 function isPrivate() {
   if (process.platform !== 'win32') return (statSync(tokensFolder).mode & 0o077) === 0
   const save = join(tmpdir(), `busy-peasy-acl-${randomBytes(8).toString('hex')}.txt`)
   try {
     execFileSync('icacls', [tokensFolder, '/save', save], { stdio: 'ignore' })
     const sddl = readFileSync(save, 'utf16le').split(/\r?\n/).find((line) => line.startsWith('D:')) ?? ''
-    return sddl.startsWith('D:P') && sddl.slice(sddl.indexOf('(')) === `(A;OICI;FA;;;${userSid()})`
+    const sid = userSid()
+    const ace = sddl.slice(sddl.indexOf('('))
+    return sddl.startsWith('D:P') && (ace === `(A;OICI;FA;;;${sid})` || (sid.endsWith('-500') && ace === '(A;OICI;FA;;;LA)'))
   } finally {
     rmSync(save, { force: true })
   }
