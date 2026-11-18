@@ -1,7 +1,8 @@
 import { app, Menu, nativeImage, Tray } from 'electron'
 import icon from '../../resources/icon.png?asset'
 import type { Account } from '../shared/api'
-import { AGENT_ACCESS_LABELS, type AgentAccess } from './agent'
+import type { AgentAccess } from '../shared/approval'
+import { AGENT_ACCESS_LABELS, AGENT_LEVEL_LABELS, type Agent } from './agent'
 
 // Passed by the login item, so a start with Windows goes straight to the tray.
 export const HIDDEN_ARG = '--hidden'
@@ -10,7 +11,8 @@ export const HIDDEN_ARG = '--hidden'
 let tray: Tray | null = null
 
 // showSignedOut shows the accounts that need a sign-in: a menu item for each, and a note in the tooltip.
-// showUpdate adds a restart item for a downloaded update. Agent access: only here, never from the page (main/agent.ts).
+// showUpdate adds a restart item for a downloaded update. Agent access and each agent's level: only here and in the
+// prompt in the window, never from agents (main/agent.ts). showAgents shows a changed agent list.
 export function createTray(actions: {
   open(): void
   signIn(accountId: number): void
@@ -18,8 +20,11 @@ export function createTray(actions: {
   update(): void
   agentAccess(): AgentAccess
   setAgentAccess(access: AgentAccess): void
+  agents(): Agent[]
+  setAgentLevel(id: string, level: AgentAccess): void
+  removeAgent(id: string): void
   quit(): void
-}): { showSignedOut(signedOut: Account[]): void; showUpdate(version: string): void } {
+}): { showSignedOut(signedOut: Account[]): void; showUpdate(version: string): void; showAgents(): void } {
   tray = new Tray(nativeImage.createFromPath(icon).resize({ width: 16, height: 16 }))
   tray.setToolTip('Busy Peasy')
   let signedOut: Account[] = []
@@ -33,12 +38,31 @@ export function createTray(actions: {
       { label: 'Sync now', click: actions.syncNow },
       {
         label: 'Agent access',
-        submenu: (['off', 'read', 'full'] as const).map((access) => ({
-          label: AGENT_ACCESS_LABELS[access],
-          type: 'radio' as const,
-          checked: actions.agentAccess() === access,
-          click: () => actions.setAgentAccess(access)
-        }))
+        submenu: [
+          // The tray access: the upper limit for every agent.
+          ...(['off', 'read', 'full'] as const).map((access) => ({
+            label: AGENT_ACCESS_LABELS[access],
+            type: 'radio' as const,
+            checked: actions.agentAccess() === access,
+            click: () => actions.setAgentAccess(access)
+          })),
+          { type: 'separator' as const },
+          ...(actions.agents().length === 0 ? [{ label: 'No agents yet', enabled: false }] : []),
+          // A Waiting agent has no level checked.
+          ...actions.agents().map((agent) => ({
+            label: `${agent.name}: ${AGENT_LEVEL_LABELS[agent.level]}`,
+            submenu: [
+              ...(['off', 'read', 'full'] as const).map((level) => ({
+                label: AGENT_ACCESS_LABELS[level],
+                type: 'radio' as const,
+                checked: agent.level === level,
+                click: () => actions.setAgentLevel(agent.id, level)
+              })),
+              { type: 'separator' as const },
+              { label: 'Remove', click: () => actions.removeAgent(agent.id) }
+            ]
+          }))
+        ]
       },
       { type: 'separator' },
       {
@@ -67,6 +91,9 @@ export function createTray(actions: {
     },
     showUpdate(version) {
       update = version
+      tray?.setContextMenu(menu())
+    },
+    showAgents() {
       tray?.setContextMenu(menu())
     }
   }

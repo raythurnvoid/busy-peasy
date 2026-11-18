@@ -1,9 +1,10 @@
-import { app, BrowserWindow, Menu, nativeTheme, Notification } from 'electron'
+import { app, BrowserWindow, Menu, nativeTheme, Notification, safeStorage } from 'electron'
 import { join } from 'node:path'
 // Unpacked: an outside Node runs it, and it cannot read inside app.asar.
 import cli from '../../resources/busy-peasy.mjs?asset&asarUnpack'
 import icon from '../../resources/icon.png?asset'
 import type { CalendarEvent } from '../shared/api'
+import type { ApprovalAnswer, ApprovalRequest } from '../shared/approval'
 import { readAgentAccess, startAgent } from './agent'
 import { createApi } from './api'
 import { listAccounts, listSessions } from './db/accounts'
@@ -11,7 +12,7 @@ import { openDb } from './db/db'
 import { getEvent } from './db/events'
 import { getSettings } from './db/settings'
 import { syncGoogle } from './google-session'
-import { askPage, notifyDataChanged, registerApi, trackWrite, writesDone } from './ipc'
+import { askApproval, askPage, notifyDataChanged, registerApi, trackWrite, writesDone } from './ipc'
 import {
   removeUnusedPartitions,
   restoreOutlookSessionCookies,
@@ -114,11 +115,11 @@ function showEvent(event: CalendarEvent | null): void {
   if (event) mainWindow?.webContents.send('show-event', event)
 }
 
-// With Full access, commands that open something for the user bring the window up. Not with Read only: a popover in
-// a window that takes focus would get the user's next Delete key. The rest works in the hidden window too.
-function agentCommand(name: string, args: Record<string, unknown>): Promise<unknown> {
+// show: agent.ts asks for it only for an agent with Full access. Not with Read only: a popover in a window that takes
+// focus would get the user's next Delete key. The rest works in the hidden window too.
+function agentCommand(name: string, args: Record<string, unknown>, show?: boolean): Promise<unknown> {
   if (!mainWindow) return Promise.reject(new Error('Busy Peasy is quitting.'))
-  if (agent?.access() === 'full' && ['openEvent', 'editEvent', 'openNewEvent', 'openSettings'].includes(name)) showMainWindow()
+  if (show) showMainWindow()
   return askPage(mainWindow.webContents, name, args)
 }
 
@@ -141,6 +142,31 @@ async function screenshot(): Promise<string> {
   if (!mainWindow) throw new Error('Busy Peasy is quitting.')
   const image = await mainWindow.webContents.capturePage(undefined, { stayHidden: true })
   return image.resize({ width: Math.min(1280, image.getSize().width) }).toJPEG(80).toString('base64')
+}
+
+// A new agent asks for access: a prompt in the page (AgentApproval.svelte). Agents cannot answer it: agent.ts refuses
+// their page input while it is open, the prompt takes only the user's own input, and ipc.ts checks the answer. The
+// window comes up without the focus (a minimized one stays minimized: restore() would take the focus) and flashes, so
+// keys the user types elsewhere stay there. Hiding the window is Not now: else the prompt would block every agent's
+// page input until the user opens the window again.
+async function askToAllowAgent(request: ApprovalRequest, signal: AbortSignal): Promise<ApprovalAnswer> {
+  const window = mainWindow
+  if (!window || quitting) return null
+  if (!window.isVisible()) window.showInactive()
+  if (!window.isFocused()) {
+    window.flashFrame(true)
+    window.once('focus', () => window.flashFrame(false))
+  }
+  const local = new AbortController()
+  const close = (): void => local.abort()
+  signal.addEventListener('abort', close)
+  window.once('hide', close)
+  try {
+    return await askApproval(window.webContents, request, local.signal)
+  } finally {
+    signal.removeEventListener('abort', close)
+    if (!window.isDestroyed()) window.off('hide', close)
+  }
 }
 
 // Chromium shows the page to Windows UI Automation only for screen readers it knows, so other UIA tools (agents, test
@@ -195,6 +221,9 @@ if (!app.requestSingleInstanceLock()) {
         agent?.setAccess(access)
         exposeToUiAutomation()
       },
+      agents: () => agent?.agents() ?? [],
+      setAgentLevel: (id, level) => agent?.setAgentLevel(id, level),
+      removeAgent: (id) => agent?.removeAgent(id),
       quit: () => app.quit()
     })
     // Also at start and at every poll: a sync run where every account is signed out sends no notify.
@@ -241,7 +270,11 @@ if (!app.requestSingleInstanceLock()) {
       command: agentCommand,
       press: pressKey,
       screenshot,
-      track: trackWrite
+      track: trackWrite,
+      encrypt: (text) => safeStorage.encryptStringAsync(text),
+      decrypt: async (data) => (await safeStorage.decryptStringAsync(data)).result,
+      ask: askToAllowAgent,
+      agentsChanged: () => tray.showAgents()
     })
     exposeToUiAutomation()
     app.on('quit', () => agent?.stop())

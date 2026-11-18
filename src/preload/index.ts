@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron'
 import type { Api, CalendarEvent, DataChanged } from '../shared/api'
+import type { ApprovalAnswer, ApprovalRequest } from '../shared/approval'
 
 // Every Api method goes through the single 'api' channel. Main checks the name and the caller.
 const names: (keyof Api)[] = [
@@ -69,5 +70,16 @@ contextBridge.exposeInMainWorld('api', {
     // Main holds commands until this: right after a start, the page is not listening yet.
     ipcRenderer.send('agent-ready')
     return () => ipcRenderer.off('agent-command', listener)
+  },
+  // Main asks the user to allow a new agent (main/ipc.ts askApproval). null: close the prompt.
+  onAgentApproval(callback: (request: ApprovalRequest | null) => void): () => void {
+    const listener = (_: IpcRendererEvent, request: ApprovalRequest | null): void => callback(request)
+    ipcRenderer.on('agent-approval', listener)
+    // Main sends the open prompt again on this: after a start or a reload.
+    ipcRenderer.send('agent-approval-ready')
+    return () => ipcRenderer.off('agent-approval', listener)
+  },
+  answerAgentApproval(id: string, answer: ApprovalAnswer): void {
+    ipcRenderer.send('agent-approval-answer', id, answer)
   }
 })

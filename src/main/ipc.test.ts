@@ -1,6 +1,6 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi, type Mock } from 'vitest'
 import type { Api } from '../shared/api'
-import { registerApi, writesDone } from './ipc'
+import { askApproval, registerApi, writesDone } from './ipc'
 
 const ipc = vi.hoisted(() => ({ handle: vi.fn(), on: vi.fn() }))
 vi.mock('electron', () => ({ ipcMain: ipc, BrowserWindow: { getAllWindows: () => [] } }))
@@ -72,5 +72,114 @@ describe('writesDone', () => {
     expect(stillWaiting()).toBe(false)
     finish()
     await result
+  })
+})
+
+describe('askApproval', () => {
+  afterEach(() => vi.useRealTimers())
+
+  const request = { id: 'a1', name: 'Claude Code', twin: false, trayAccess: 'full' as const }
+  const appFrame = { origin: 'http://localhost:5173' }
+
+  // A page: send records what main sends; destroy() closes it.
+  type Page = { send: Mock; once: Mock; off: Mock; isDestroyed(): boolean; destroy(): void }
+  function page(): Page {
+    let destroyed = (): void => {}
+    return {
+      send: vi.fn(),
+      once: vi.fn((_: string, f: () => void) => (destroyed = f)),
+      off: vi.fn(),
+      isDestroyed: () => false,
+      destroy: () => destroyed()
+    }
+  }
+
+  // Opens a prompt on a page, and gives the page's ready and answer messages.
+  function open(
+    contents = page(),
+    signal = new AbortController().signal
+  ): {
+    contents: Page
+    answered(): Promise<unknown>
+    ready(sender?: unknown): void
+    answer(id: unknown, value: unknown, event?: object): void
+  } {
+    vi.useFakeTimers()
+    registerApi({} as Api, 'http://localhost:5173/')
+    const on = (channel: string): ((...args: unknown[]) => void) => ipc.on.mock.calls.findLast(([c]) => c === channel)![1]
+    let answer: unknown = 'none'
+    void askApproval(contents as never, request, signal).then((a) => (answer = a))
+    return {
+      contents,
+      answered: async () => (await vi.advanceTimersByTimeAsync(0), answer),
+      ready: (sender: unknown = contents) => on('agent-approval-ready')({ sender }),
+      answer: (id: unknown, value: unknown, event: object = {}) =>
+        on('agent-approval-answer')({ sender: contents, senderFrame: appFrame, ...event }, id, value)
+    }
+  }
+
+  it('sends the prompt, and again when the page is ready (after a start or a reload)', () => {
+    const prompt = open()
+    expect(prompt.contents.send).toHaveBeenCalledWith('agent-approval', request)
+    prompt.ready()
+    prompt.ready(page())
+    expect(prompt.contents.send).toHaveBeenCalledTimes(2)
+  })
+
+  it('takes the right answer from the page after 1 s, once', async () => {
+    const prompt = open()
+    vi.advanceTimersByTime(1000)
+    prompt.answer('a1', 'read')
+    prompt.answer('a1', 'full')
+    expect(await prompt.answered()).toBe('read')
+  })
+
+  it('ignores an answer sooner than 1 s after the prompt was sent', async () => {
+    const prompt = open()
+    vi.advanceTimersByTime(999)
+    prompt.answer('a1', 'full')
+    expect(await prompt.answered()).toBe('none')
+    vi.advanceTimersByTime(1)
+    prompt.answer('a1', 'full')
+    expect(await prompt.answered()).toBe('full')
+  })
+
+  it('ignores an answer for another agent, from another page or origin, or with a wrong value', async () => {
+    const prompt = open()
+    vi.advanceTimersByTime(1000)
+    prompt.answer('b2', 'full')
+    prompt.answer('a1', 'full', { sender: page() })
+    prompt.answer('a1', 'full', { senderFrame: { origin: 'https://example.com' } })
+    prompt.answer('a1', 'full', { senderFrame: { origin: 'null' } })
+    prompt.answer('a1', 'admin')
+    expect(await prompt.answered()).toBe('none')
+    prompt.answer('a1', null)
+    expect(await prompt.answered()).toBe(null)
+  })
+
+  it('closes on abort, and a late answer finds nothing', async () => {
+    const abort = new AbortController()
+    const prompt = open(page(), abort.signal)
+    abort.abort()
+    expect(await prompt.answered()).toBe(null)
+    expect(prompt.contents.send).toHaveBeenLastCalledWith('agent-approval', null)
+    vi.advanceTimersByTime(1000)
+    prompt.answer('a1', 'full')
+    expect(await prompt.answered()).toBe(null)
+  })
+
+  it('closes as Not now after 2 minutes without an answer', async () => {
+    const prompt = open()
+    vi.advanceTimersByTime(2 * 60_000 - 1)
+    expect(await prompt.answered()).toBe('none')
+    vi.advanceTimersByTime(1)
+    expect(await prompt.answered()).toBe(null)
+    expect(prompt.contents.send).toHaveBeenLastCalledWith('agent-approval', null)
+  })
+
+  it('answers Not now when the page is gone', async () => {
+    const prompt = open()
+    prompt.contents.destroy()
+    expect(await prompt.answered()).toBe(null)
   })
 })

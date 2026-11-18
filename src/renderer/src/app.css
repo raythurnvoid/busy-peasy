@@ -119,12 +119,12 @@ body[data-drag='ns-resize'] * {
   box-shadow: inset 0 -1px 0 var(--button-lip);
 }
 
-.pill-btn:hover:not(:disabled) {
+.pill-btn:hover:not(:disabled, [aria-disabled='true']) {
   background: var(--accent-wash);
   border-color: color-mix(in oklab, var(--accent) 60%, var(--line));
 }
 
-.pill-btn:active:not(:disabled) {
+.pill-btn:active:not(:disabled, [aria-disabled='true']) {
   background: var(--accent-wash-deep);
   border-color: color-mix(in oklab, var(--accent) 75%, var(--line));
   box-shadow: inset 0 2px 3px var(--button-press);
@@ -141,14 +141,14 @@ body[data-drag='ns-resize'] * {
   box-shadow: inset 0 -2px 0 var(--button-lip);
 }
 
-.filled-btn:hover:not(:disabled) {
+.filled-btn:hover:not(:disabled, [aria-disabled='true']) {
   background: var(--accent-deep-hover);
   box-shadow:
     inset 0 -2px 0 var(--button-lip),
     0 4px 12px -4px color-mix(in oklab, var(--accent-deep) 90%, transparent);
 }
 
-.filled-btn:active:not(:disabled) {
+.filled-btn:active:not(:disabled, [aria-disabled='true']) {
   background: var(--accent-deep-press);
   box-shadow: inset 0 2px 3px var(--button-press);
   transform: translateY(1px);

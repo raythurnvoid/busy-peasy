@@ -14,8 +14,10 @@
     Settings,
     Times
   } from '../../shared/api'
+  import { refuseWhileAsking, type ApprovalRequest } from '../../shared/approval'
   import { ANSWER_LABELS, canChangeTime, hasGuests, isInvite, isOwnSeries } from '../../shared/events'
   import { mergeReminders } from '../../shared/reminders'
+  import AgentApproval from './components/AgentApproval.svelte'
   import ColorMenu from './components/ColorMenu.svelte'
   import EventDialog from './components/EventDialog.svelte'
   import EventPopover from './components/EventPopover.svelte'
@@ -149,6 +151,8 @@
   // The "which events" question for a drag or a delete of one event of the user's own series, asked first. guests: the
   // note says they get mail. color: a color pick waits for the answer (key null: Default).
   let scoping: { event: CalendarEvent; times: Times | null; choices: Scope[]; guests: boolean; color?: { key: string | null } } | null = $state(null)
+  // The prompt that asks the user to allow a new agent (main/ipc.ts askApproval).
+  let approval: ApprovalRequest | null = $state(null)
 
   const weekStartDay = $derived(settings.weekStart ?? localeWeekStart())
   const showWeekends = $derived(settings.showWeekends)
@@ -291,10 +295,18 @@
     })
   })
 
-  // Agent commands (main/agent.ts). The app commands fail while a dialog or quick create is open, so unsaved work stays;
-  // snapshot, click and fill act on what is on screen, dialogs too. Main checked the access and found the events.
   $effect(() => {
-    return window.api.onAgentCommand(async (name, args) => {
+    // A block body: the context bridge would try to copy a returned $state proxy back, and fail.
+    return window.api.onAgentApproval((request) => {
+      approval = request
+    })
+  })
+
+  // Agent commands (main/agent.ts). The app commands fail while a dialog or quick create is open, so unsaved work stays;
+  // snapshot, click and fill act on what is on screen, dialogs too. Main checked the access and found the events. While
+  // the prompt to allow an agent is open, only snapshot and getState run: that check comes first (main checks too).
+  $effect(() => {
+    return window.api.onAgentCommand(refuseWhileAsking(() => approval !== null, async (name, args) => {
       if (name === 'snapshot') return snapshot()
       if (name === 'click') return click(args)
       if (name === 'fill') return fill(args)
@@ -332,12 +344,17 @@
         await runSearch(search!.ran)
       } else if (name === 'openSettings') {
         settingsOpen = true
+      } else if (name === 'addAccount') {
+        if (args.provider !== 'google' && args.provider !== 'outlook') throw new Error('provider must be "google" or "outlook".')
+        if (signIn.busy) throw new Error('A sign-in is running in Busy Peasy. Wait until the user finishes it.')
+        // Not awaited: the user signs in now, which can take minutes. getState shows how it goes.
+        void (args.provider === 'google' ? runAction(window.api.addGoogleAccount) : signInOutlook())
       } else {
         throw new Error('Unknown command')
       }
       await tick()
       return agentState()
-    })
+    }))
   })
 
   // What getState and the app commands tell an agent.
@@ -350,7 +367,9 @@
       dialog: openDialog(),
       quickCreate: draft !== null,
       search: search ? { text: search.ran, found: found?.length ?? null } : null,
-      toast: toast?.text ?? null
+      toast: toast?.text ?? null,
+      signIn: { running: signIn.busy || signIn.outlookOpen, error: signIn.error || null },
+      approval: approval ? `Busy Peasy is asking the user whether to allow "${approval.name}". Wait until the user answers.` : null
     }
   }
 
@@ -1269,6 +1288,19 @@
       else startDelete(event, notify, scope)
     }}
   />
+{/if}
+
+<!-- A new prompt, also for the next agent: the arm time starts again. -->
+{#if approval}
+  {#key approval.id}
+    <AgentApproval
+      request={approval}
+      onanswer={(answer) => {
+        window.api.answerAgentApproval(approval!.id, answer)
+        approval = null
+      }}
+    />
+  {/key}
 {/if}
 
 {#if scoping}

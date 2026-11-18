@@ -8,11 +8,14 @@
 //   import { call } from './busy-peasy.mjs'         from a script: await call('listCalendars')
 //
 // --dev (or BUSY_PEASY_DEV=1) talks to a dev run (pnpm dev) instead of the installed app.
+// --agent=<name> (or BUSY_PEASY_AGENT) is the agent's name; MCP takes the client's name. Each agent gets its own token,
+// kept in agent-tokens\. A call waits up to 25 s for the user to allow the agent in Busy Peasy.
 
 // Plain JavaScript, so any Node can run it without a build: it has no return types.
 /* eslint-disable @typescript-eslint/explicit-function-return-type */
-import { spawn } from 'node:child_process'
-import { existsSync, readFileSync, writeFileSync } from 'node:fs'
+import { execFileSync, spawn } from 'node:child_process'
+import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto'
+import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { homedir, tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createInterface } from 'node:readline'
@@ -27,14 +30,30 @@ const folder = join(appData, dev ? 'busy-peasy-dev' : 'busy-peasy')
 const apiFile = join(folder, 'agent-api.json')
 // The last method list, so MCP has its tools while the app is closed or its access is off.
 const methodsFile = join(folder, 'agent-methods.json')
+const tokensFolder = join(folder, 'agent-tokens')
 // Where the Windows installer puts the app. Only an absolute path: a relative one could start a program from the
 // current folder.
 const exe = process.platform === 'win32' && process.env.LOCALAPPDATA ? join(process.env.LOCALAPPDATA, 'Programs', 'busy-peasy', 'busy-peasy.exe') : null
 const START_WAIT_MS = 20_000
 // After a second start quits (the app runs already, with access off), a file may still come this late.
 const EXIT_WAIT_MS = 2000
+// An empty token file younger than this: another process registers the same name right now.
+const CLAIM_MS = 60_000
+// While the agent waits for the user, a call tries again this often, for up to BUSY_PEASY_WAIT_MS (tests) or 25 s.
+const RETRY_MS = 2000
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+
+// MCP sets it from the client's name.
+let defaultName = 'Busy Peasy CLI'
+// Read at each call, so a script can set BUSY_PEASY_AGENT after the import.
+const agentName = () =>
+  process.argv.find((a) => a.startsWith('--agent='))?.slice('--agent='.length) || process.env.BUSY_PEASY_AGENT || defaultName
+
+// The same text as the app's (src/main/agent.ts).
+const waiting = (name) =>
+  `Busy Peasy is waiting for the user to allow "${name}". Ask the user to answer the Busy Peasy prompt, or, if none is ` +
+  `showing, to pick a level in the tray menu: Agent access > ${name}. Then try again.`
 
 // null also for a file left by a crash: its app is gone, and another program may listen on its port now.
 function readApiFile() {
@@ -47,25 +66,171 @@ function readApiFile() {
   }
 }
 
-async function request(file, method, params) {
+// The error keeps the HTTP status: 401 means register again.
+async function request(file, method, params, token) {
   const response = await fetch(`${file.url}/v1/${method}`, {
     method: method === 'help' ? 'GET' : 'POST',
-    headers: { Authorization: `Bearer ${file.token}`, 'Content-Type': 'application/json' },
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
     body: method === 'help' ? undefined : JSON.stringify(params ?? {})
+  }).catch((e) => {
+    // The app may be gone, and another program may take its port: the next call proves it again.
+    proven.delete(appKey(file))
+    throw e
   })
   const body = await response.json()
-  if (!response.ok) throw new Error(body.error ?? `HTTP ${response.status}`)
+  if (!response.ok) throw Object.assign(new Error(body.error ?? `HTTP ${response.status}`), { status: response.status })
   return body.result
+}
+
+// Apps that proved they are Busy Peasy, by address and pid.
+const proven = new Set()
+const appKey = (file) => `${file.url} ${file.pid}`
+
+// Before the client sends a token, the app proves it knows the register token: a program that took the port of an app
+// that is gone gets no token.
+async function proveApp(file) {
+  const key = appKey(file)
+  if (proven.has(key)) return
+  const nonce = randomBytes(32).toString('hex')
+  const response = await fetch(`${file.url}/v1/hello`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ nonce })
+  })
+  if (!response.ok) throw new Error('This Busy Peasy is older than this client. Update Busy Peasy.')
+  const proof = await response.json().then((body) => body.result?.proof, () => null)
+  const sent = Buffer.from(typeof proof === 'string' ? proof : '', 'hex')
+  const wanted = createHmac('sha256', file.token).update(nonce).digest()
+  if (sent.length !== wanted.length || !timingSafeEqual(sent, wanted)) {
+    throw new Error('The program at the address in agent-api.json is not Busy Peasy. Restart Busy Peasy.')
+  }
+  proven.add(key)
+}
+
+// One file per name, in any case: "claude code" is "Claude Code", as in the app. The hash keeps two names that make
+// the same slug apart.
+function tokenFile(name) {
+  const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 40)
+  return join(tokensFolder, `${slug}-${createHash('sha256').update(name.toLowerCase()).digest('hex').slice(0, 8)}.json`)
+}
+
+// This user's SID: plain ASCII, unlike user names in icacls output (OEM code page: "José" would not match). whoami by
+// its full path: Git for Windows has another whoami.
+const userSid = () =>
+  execFileSync(join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'whoami.exe'), ['/user', '/fo', 'csv', '/nh'], {
+    encoding: 'utf8'
+  }).match(/S-1-[\d-]+/)[0]
+
+// Only this user may read the tokens. A new folder gets that ACL before any token is in it (like agent-api.json,
+// src/main/agent.ts): /reset drops what the parent passes down; (OI)(CI): files made in it get only this entry. If that
+// fails, the folder goes. A folder that is there already is only checked, never changed.
+function protectTokensFolder() {
+  const created = mkdirSync(tokensFolder, { recursive: true, mode: 0o700 }) !== undefined
+  if (created && process.platform === 'win32') {
+    try {
+      execFileSync('icacls', [tokensFolder, '/reset'], { stdio: 'ignore' })
+      execFileSync('icacls', [tokensFolder, '/inheritance:r', '/grant:r', `*${userSid()}:(OI)(CI)F`], { stdio: 'ignore' })
+    } catch (e) {
+      rmSync(tokensFolder, { recursive: true, force: true })
+      throw new Error('Could not protect the agent-tokens folder.', { cause: e })
+    }
+  }
+  if (!created && !isPrivate()) {
+    throw new Error(`Other accounts may read ${tokensFolder}. Remove that folder: its agents then register again.`)
+  }
+}
+
+// One entry, not inherited (D:P): this user's SID, full control, passed down to the files. icacls /save writes the
+// ACL as SDDL (UTF-16), for example "D:PAI(A;OICI;FA;;;S-1-5-21-...)".
+function isPrivate() {
+  if (process.platform !== 'win32') return (statSync(tokensFolder).mode & 0o077) === 0
+  const save = join(tmpdir(), `busy-peasy-acl-${randomBytes(8).toString('hex')}.txt`)
+  try {
+    execFileSync('icacls', [tokensFolder, '/save', save], { stdio: 'ignore' })
+    const sddl = readFileSync(save, 'utf16le').split(/\r?\n/).find((line) => line.startsWith('D:')) ?? ''
+    return sddl.startsWith('D:P') && sddl.slice(sddl.indexOf('(')) === `(A;OICI;FA;;;${userSid()})`
+  } finally {
+    rmSync(save, { force: true })
+  }
+}
+
+function readTokenFile(path) {
+  try {
+    return JSON.parse(readFileSync(path, 'utf8'))
+  } catch {
+    return null
+  }
+}
+
+// This agent's token: from its file, else it registers with the register token from agent-api.json. Never printed.
+async function agentToken(file) {
+  const name = agentName()
+  const path = tokenFile(name)
+  const saved = readTokenFile(path)
+  if (typeof saved?.name === 'string' && saved.name.toLowerCase() === name.toLowerCase() && saved.token) return saved.token
+  // Before registering: a token must never land in a folder others can read.
+  protectTokensFolder()
+  // Claims the name: only one process registers it.
+  try {
+    writeFileSync(path, '', { flag: 'wx', mode: 0o600 })
+  } catch (e) {
+    if (e.code !== 'EEXIST') throw e
+    if (Date.now() - statSync(path).mtimeMs < CLAIM_MS) throw new Error(waiting(name), { cause: e })
+    // Left by a crash.
+    rmSync(path, { force: true })
+    writeFileSync(path, '', { flag: 'wx', mode: 0o600 })
+  }
+  let result
+  try {
+    result = await request(file, 'register', { name }, file.token)
+  } catch (e) {
+    rmSync(path, { force: true })
+    if (e.status === 404) throw new Error('This Busy Peasy is older than this client. Update Busy Peasy.', { cause: e })
+    throw e
+  }
+  writeFileSync(path, JSON.stringify({ name, token: result.token }))
+  return result.token
+}
+
+// help needs no agent: an MCP server lists its tools without a prompt. Other methods use the agent's token.
+async function requestAsAgent(file, method, params) {
+  await proveApp(file)
+  if (method === 'help') return request(file, method, params, file.token)
+  const token = await agentToken(file)
+  try {
+    return await request(file, method, params, token)
+  } catch (e) {
+    if (e.status !== 401) throw e
+    // The user removed the agent, or the app lost its list: register again, once. Remove the file only if it still
+    // holds the token that failed: a call running at the same time may have put a new one there.
+    const path = tokenFile(agentName())
+    if (readTokenFile(path)?.token === token) rmSync(path, { force: true })
+    return request(file, method, params, await agentToken(file))
+  }
 }
 
 let started = false
 
-// Calls one method. If the app is not running, starts the installed app in the tray once and waits for it.
+// Calls one method. While the user has not allowed the agent yet, tries again until the wait time ends, then gives the
+// waiting text.
 export async function call(method, params) {
+  const end = Date.now() + Number(process.env.BUSY_PEASY_WAIT_MS ?? 25_000)
+  for (;;) {
+    try {
+      return await callOnce(method, params)
+    } catch (e) {
+      if (!e.message.startsWith('Busy Peasy is waiting for the user') || Date.now() + RETRY_MS > end) throw e
+      await sleep(RETRY_MS)
+    }
+  }
+}
+
+// If the app is not running, starts the installed app in the tray once and waits for it.
+async function callOnce(method, params) {
   const file = readApiFile()
   try {
     if (!file) throw new Error('No agent-api.json')
-    return await request(file, method, params)
+    return await requestAsAgent(file, method, params)
   } catch (e) {
     // Only a missing app is retried: an answer from the app (a wrong argument) is the result.
     if (file && !(e instanceof TypeError)) throw e
@@ -77,7 +242,7 @@ export async function call(method, params) {
     child.on('exit', () => (end = Math.min(end, Date.now() + EXIT_WAIT_MS)))
     for (; Date.now() < end; await sleep(500)) {
       const next = readApiFile()
-      if (next && next.pid !== file?.pid) return request(next, method, params)
+      if (next && next.pid !== file?.pid) return requestAsAgent(next, method, params)
     }
     throw notRunning()
   }
@@ -91,6 +256,7 @@ const notRunning = () =>
 
 // MCP over stdio: one JSON-RPC message per line. Tools come from the app's method list.
 async function mcp() {
+  defaultName = 'MCP client'
   const out = (message) => process.stdout.write(JSON.stringify({ jsonrpc: '2.0', ...message }) + '\n')
   const tools = async () => {
     let methods
@@ -123,10 +289,13 @@ async function mcp() {
       return { content: [{ type: 'text', text: e.message }], isError: true }
     }
   }
-  // Not awaited in the loop: a slow call (up to 30 s while the app waits for the user) must not hold up ping or others.
+  // Not awaited in the loop: a slow call (up to 25 s while the user is asked to allow the agent) must not hold up ping
+  // or others.
   const answer = async ({ id, method, params }) => {
     try {
       if (method === 'initialize') {
+        // The agent's name, in the prompt that asks the user to allow it: "Claude Code", "Codex".
+        defaultName = params?.clientInfo?.title || params?.clientInfo?.name || defaultName
         out({
           id,
           result: {
@@ -162,7 +331,7 @@ async function mcp() {
 }
 
 async function cli() {
-  const [command, json] = process.argv.slice(2).filter((a) => a !== '--dev')
+  const [command, json] = process.argv.slice(2).filter((a) => a !== '--dev' && !a.startsWith('--agent='))
   if (command === 'mcp') return mcp()
   if (!command || command === 'help' || command === '--help') {
     const help = await call('help')

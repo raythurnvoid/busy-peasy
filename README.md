@@ -36,22 +36,41 @@ $ pnpm build:linux
 ### Agent access
 
 Agents (Claude Code, Codex, scripts) can read and change the calendar and use the app window. Everything stays on this
-PC. Turn it on in the tray menu: **Agent access** > **Read only** or **Full access**. It is **Off** by default.
+PC. An agent with Full access can also start adding an account (`addAccount`); you still sign in yourself. Turn it on in the tray menu: **Agent access** > **Read only** or **Full access**. It is **Off** by default.
 
 - **Read only**: read accounts, calendars, events and settings; see the screen (`getState`, `snapshot`, `screenshot`);
   move around (`navigate`, `openEvent`, `search`).
 - **Full access**: also create, change, delete and answer events, and use the window like a person (`click`, `fill`,
   `press`), including Save and Delete.
 
-The app listens on `127.0.0.1` only, on a new port with a new token at each start. It writes both to
+The app listens on `127.0.0.1` only, on a new port with a new register token at each start. It writes both to
 `%APPDATA%\busy-peasy\agent-api.json` (dev runs: `busy-peasy-dev`), with `cli`, the path of the client script. Only
-your Windows account can read that file. Every write is logged in `agent-log.jsonl` in the same folder.
+your Windows account can read that file. The register token can only register a new agent and read `help`.
 
-The access limits agents that only have the CLI or the MCP tools. A program that runs as you can change
-`agent-access.json` itself, so do not count on Read only against such a program.
+Each agent gets its own token. The first time an agent calls a method, the Busy Peasy window asks you whether to allow
+it: **Deny**, **Not now**, **Allow read only** or **Allow full access**. The window comes up without taking the focus
+and flashes in the taskbar, so keys you type elsewhere stay there. A mouse click on a button answers once the prompt
+has been up for 1 second. Keys answer once the window has had the focus for 1 second, and any other key (Tab too)
+starts that second again. With no answer in 2 minutes, the prompt closes as **Not now**. Until you allow the agent, its
+calls wait up to 25 seconds, then fail with a "waiting" message. After **Not now** it asks again when the agent calls,
+at most once every 10 minutes. While the prompt is open, no agent can use `click`, `fill`, `press` or the commands that
+change the window, and agents cannot answer it.
+
+The tray menu **Agent access** lists every agent: pick a level for it there, or **Remove** it. The tray access (Off,
+Read only, Full access) is the upper limit for all agents. The app keeps the agent list encrypted in `agents.bin` (only
+a hash of each token); agents still waiting at a restart are dropped and ask again. The client keeps the tokens in
+`agent-tokens\`, a folder only your Windows account can read, and sends a token only after the app proves it knows the
+register token. Every write is logged in `agent-log.jsonl` with the agent's name.
+
+The agent name is a label, not a check of who the program is. A program that runs as you can use an allowed agent's
+name or token, read the token files, click the Busy Peasy window, change `agent-access.json`, or put back an old
+`agents.bin`. So asking you to allow an agent stops a new program only if it does not reuse an allowed agent. It is not
+a wall against programs that run as you.
 
 The client script is `resources/busy-peasy.mjs` (in the installed app: `resources\app.asar.unpacked\resources\`). It
-needs Node and has no dependencies. Add `--dev` to talk to a `pnpm dev` run.
+needs Node and has no dependencies. Add `--dev` to talk to a `pnpm dev` run. Add `--agent=<name>` (or set
+`BUSY_PEASY_AGENT`) to name the agent; the default is `Busy Peasy CLI`. The MCP server uses the name the MCP client
+sends (for example `Claude Code`).
 
 ```bash
 node resources/busy-peasy.mjs help                         # the methods and their params
@@ -75,8 +94,10 @@ The MCP server keeps the last tool list (`agent-methods.json`), so the tools sta
 app is closed, the first call starts the installed app in the tray.
 
 From a script: `import { call } from './busy-peasy.mjs'`, then `await call('listEvents', { start, end })`. Plain HTTP
-also works: `POST <url>/v1/<method>` with `Authorization: Bearer <token>` and a JSON object of params. `GET /v1/help`
-lists the methods.
+also works: first `POST <url>/v1/register` with `Authorization: Bearer <token from agent-api.json>` and
+`{"name":"My script"}`. It returns the agent's own token. After you allow the agent, `POST <url>/v1/<method>` with
+`Authorization: Bearer <agent token>` and a JSON object of params. `GET /v1/help` lists the methods; it works with
+either token.
 
 While agent access is on, the app also shows its page to Windows UI Automation tools (Chromium does that only for known
 screen readers otherwise).

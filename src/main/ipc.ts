@@ -1,5 +1,6 @@
 import { BrowserWindow, ipcMain, type WebContents } from 'electron'
 import type { Api, DataChanged } from '../shared/api'
+import { APPROVAL_ARM_MS, APPROVAL_MAX_MS, type ApprovalAnswer, type ApprovalRequest } from '../shared/approval'
 import { isAppOrigin } from './security'
 
 // An agent command waits this long for the page.
@@ -17,6 +18,13 @@ const commands = new Map<
 let lastCommand = 0
 // Pages whose App.svelte listens for agent commands.
 const listening = new WeakSet<WebContents>()
+// The open prompt of askApproval. sentAt: when main last sent it to the page.
+let approval: {
+  request: ApprovalRequest
+  contents: WebContents
+  sentAt: number
+  done(answer: ApprovalAnswer): void
+} | null = null
 
 // Agent writes come here too (agent.ts), so Quit waits for them as well.
 export function trackWrite(write: Promise<unknown>): void {
@@ -54,6 +62,51 @@ export function registerApi(api: Api, devUrl: string | undefined): void {
     if (!command || event.sender !== command.contents || typeof reply !== 'object' || reply === null) return
     commands.delete(id as number)
     command.done(reply)
+  })
+  // The page shows prompts now: send the open one again, also after a reload.
+  ipcMain.on('agent-approval-ready', (event) => {
+    if (approval?.contents === event.sender) sendApproval()
+  })
+  // The user's answer to askApproval. Only from our page, for the agent that is asked now, once, and not sooner than
+  // APPROVAL_ARM_MS after main sent the prompt: keys that were already on their way must not answer.
+  ipcMain.on('agent-approval-answer', (event, id: unknown, answer: unknown) => {
+    const origin = event.senderFrame?.origin ?? 'null'
+    if (!approval || event.sender !== approval.contents || origin === 'null' || !isAppOrigin(origin, devUrl)) return
+    if (id !== approval.request.id || !['off', 'read', 'full', null].includes(answer as ApprovalAnswer)) return
+    if (Date.now() - approval.sentAt < APPROVAL_ARM_MS) return
+    approval.done(answer as ApprovalAnswer)
+  })
+}
+
+function sendApproval(): void {
+  if (!approval) return
+  approval.sentAt = Date.now()
+  approval.contents.send('agent-approval', approval.request)
+}
+
+// Shows the prompt that asks the user to allow a new agent (AgentApproval.svelte) and returns the answer. null: Not
+// now, or the signal closed the prompt, or the page is gone, or nobody answered within APPROVAL_MAX_MS. One at a time:
+// agent.ts asks in turn.
+export function askApproval(contents: WebContents, request: ApprovalRequest, signal: AbortSignal): Promise<ApprovalAnswer> {
+  return new Promise((resolve) => {
+    const done = (answer: ApprovalAnswer): void => {
+      approval = null
+      clearTimeout(timer)
+      signal.removeEventListener('abort', closed)
+      contents.off('destroyed', closed)
+      resolve(answer)
+    }
+    const closed = (): void => {
+      done(null)
+      if (!contents.isDestroyed()) contents.send('agent-approval', null)
+    }
+    approval = { request, contents, sentAt: 0, done }
+    signal.addEventListener('abort', closed)
+    contents.once('destroyed', closed)
+    // A prompt nobody answers must not block page input for ever. The agent is asked again at a later call (agent.ts).
+    const timer = setTimeout(closed, APPROVAL_MAX_MS)
+    // A page that is not listening yet gets it on agent-approval-ready.
+    sendApproval()
   })
 }
 
