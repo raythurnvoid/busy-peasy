@@ -5,6 +5,8 @@ directories:
 files:
   - '!**/.vscode/*'
   - '!src/*'
+  # The download site (website/index.html), not part of the app.
+  - '!website/**'
   - '!electron.vite.config.{js,ts,mjs,cjs}'
   - '!svelte.config.mjs'
   - '!{.eslintcache,eslint.config.mjs,.prettierignore,.prettierrc.yaml,dev-app-update.yml,CHANGELOG.md,README.md}'

@@ -1,0 +1,816 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Busy Peasy</title>
+<meta name="description" content="All your Google and Microsoft 365 calendars in one app, with reminders you can't miss. Free for Windows.">
+<meta name="author" content="Daniele Loreto">
+<meta name="color-scheme" content="light dark">
+<link rel="icon" type="image/png" href="icon.png">
+<!-- Link previews in chats and social posts. -->
+<meta property="og:title" content="Busy Peasy">
+<meta property="og:description" content="All your Google and Microsoft 365 calendars in one app, with reminders you can't miss.">
+<meta property="og:url" content="https://busy-peasy.bonobo-senate.com/">
+<meta property="og:image" content="https://busy-peasy.bonobo-senate.com/icon.png">
+<meta name="twitter:card" content="summary">
+<style>
+/* Same Palazzo tokens as the app (src/renderer/src/styles/palazzo-core.css) and the Only Whispers site. Light or
+   dark follows the system setting. */
+@font-face {
+  font-family: "Cinzel";
+  src: url("fonts/cinzel-latin-wght-normal.woff2") format("woff2");
+  font-weight: 400 900;
+  font-display: swap;
+}
+@font-face {
+  font-family: "EB Garamond";
+  src: url("fonts/eb-garamond-latin-wght-normal.woff2") format("woff2");
+  font-weight: 400 800;
+  font-display: swap;
+}
+@font-face {
+  font-family: "EB Garamond";
+  src: url("fonts/eb-garamond-latin-wght-italic.woff2") format("woff2");
+  font-weight: 400 800;
+  font-style: italic;
+  font-display: swap;
+}
+
+:root {
+  --stone-0: #ede3d2;
+  --stone-2: #fcf8f1;
+  --stone-3: #efe5d5;
+  --line: #d9cab0;
+  --ink: #2a1e16;
+  --ink-muted: #76624f;
+  --accent: #e07a1c;
+  --accent-ink: #b5590c;
+  --accent-wash: #f9e3c8;
+  --on-accent: #fffaf3;
+  --ornament: #c4aa80;
+  /* The logo: the app icon's colors (calendar, and the B·P letters on it). */
+  --mark: #7a4f27;
+  --mark-tie: #f6efe3;
+  --marble: url("marble-light.webp");
+  --shadow-float: 0 4px 12px -4px rgb(30 20 10 / 0.35), 0 1px 2px rgb(30 20 10 / 0.18);
+  --serif: "EB Garamond", Georgia, serif;
+  --caps: "Cinzel", "EB Garamond", Georgia, serif;
+  /* The sticky header's full height, moulding included. */
+  --header-h: 84px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --stone-0: #140f0b;
+    --stone-2: #251c15;
+    --stone-3: #2e231a;
+    --line: #4a3a2b;
+    --ink: #f1e6d3;
+    --ink-muted: #b39e86;
+    --accent: #f08b2e;
+    --accent-ink: #f6a55a;
+    --accent-wash: #3a2614;
+    --on-accent: #1c150f;
+    --ornament: #6e573f;
+    --mark: #f1e6d3;
+    --mark-tie: #1c150f;
+    --marble: url("marble-dark.webp");
+    --shadow-float: 0 4px 14px -4px rgb(0 0 0 / 0.7), 0 1px 2px rgb(0 0 0 / 0.5);
+  }
+}
+
+/* The download section is always dark, so the dark screenshot (later the promo video) blends into its marble in
+   both themes. Same values as the dark block above. */
+.hero {
+  --stone-0: #140f0b;
+  --stone-2: #251c15;
+  --stone-3: #2e231a;
+  --line: #4a3a2b;
+  --ink: #f1e6d3;
+  --ink-muted: #b39e86;
+  --accent: #f08b2e;
+  --accent-ink: #f6a55a;
+  --accent-wash: #3a2614;
+  --on-accent: #1c150f;
+  --ornament: #6e573f;
+  --mark: #f1e6d3;
+  --mark-tie: #1c150f;
+  --marble: url("marble-dark.webp");
+  --shadow-float: 0 4px 14px -4px rgb(0 0 0 / 0.7), 0 1px 2px rgb(0 0 0 / 0.5);
+  color: var(--ink);
+}
+
+* { box-sizing: border-box; }
+
+/* Each section fills the screen and the scroll snaps to it. */
+html {
+  scroll-snap-type: y mandatory;
+  scroll-padding-top: var(--header-h);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  html { scroll-behavior: smooth; }
+}
+
+body {
+  margin: 0;
+  color: var(--ink);
+  font-family: var(--serif);
+  font-size: 18px;
+  line-height: 1.5;
+  /* Garamond has a small x-height, like in the app. */
+  font-size-adjust: 0.46;
+  overflow-x: hidden;
+}
+
+/* Fixed marble, so the header, the body and the download section line up. */
+body,
+header,
+.hero {
+  background-color: var(--stone-0);
+  background-image: var(--marble);
+  background-size: 640px 640px;
+  background-attachment: fixed;
+}
+
+a { color: var(--accent-ink); }
+
+.caps {
+  font-family: var(--caps);
+  font-size-adjust: none;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+/* ---- Logo: the calendar mark, then the name on one line ---- */
+.logo {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 0.75em;
+  margin: 0;
+  color: var(--mark);
+  font-size: 13px;
+  font-weight: inherit;
+  line-height: 1.2;
+  text-decoration: none;
+}
+
+.logo svg {
+  flex: none;
+  width: 3em;
+  height: 3em;
+}
+
+.logo-name {
+  font-family: var(--caps);
+  font-size: 1.6em;
+  font-size-adjust: none;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+/* ---- Header with tabs ---- */
+header {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+}
+
+.bar {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  height: calc(var(--header-h) - 10px);
+  padding: 0 clamp(16px, 4vw, 48px);
+}
+
+.tabs {
+  display: flex;
+  gap: 4px;
+  margin: 0 auto;
+}
+
+.tabs a,
+.source {
+  padding: 8px 12px;
+  border-radius: 2px;
+  color: var(--ink-muted);
+  font-size: 12px;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.tabs a:hover,
+.source:hover {
+  background: var(--stone-3);
+  color: var(--ink);
+}
+
+/* Active tab: a wash with a full outline, like the app's sidebar. The text leans toward the ink, so the small caps
+   stay readable on the light wash. */
+.tabs a[aria-current="true"] {
+  background: var(--accent-wash);
+  color: color-mix(in oklab, var(--accent-ink) 65%, var(--ink));
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--accent) 75%, var(--accent-wash));
+}
+
+.source {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.source svg { flex: none; }
+
+/* Egg-and-dart moulding, like the app's top bar. */
+.moulding {
+  height: 10px;
+  background: var(--ornament);
+  mask-image: url("egg.svg");
+  mask-repeat: repeat-x;
+  mask-position: center;
+}
+
+/* ---- Sections ---- */
+.snap {
+  position: relative;
+  min-height: calc(100svh - var(--header-h));
+  scroll-snap-align: start;
+}
+
+/* ---- Hero ---- */
+.hero {
+  display: flex;
+  align-items: center;
+  padding: 48px clamp(16px, 6vw, 96px);
+}
+
+/* The stage and the zoom snap point only matter on phones. */
+.stage { display: contents; }
+
+.snap-end { display: none; }
+
+/* The app sits on the right and fades into the page on its edges. Later the promo video takes its place. */
+.media-box {
+  position: absolute;
+  top: 50%;
+  right: 0;
+  width: min(62vw, 1160px);
+  aspect-ratio: 1348 / 1000;
+  transform: translateY(-50%);
+}
+
+/* A longer fade on the left than the Only Whispers video: the calendar's lines would show behind the text. */
+.hero .media {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
+  mask-image:
+    linear-gradient(to right, transparent, #000 36%),
+    linear-gradient(to bottom, transparent, #000 14%, #000 86%, transparent);
+  mask-composite: intersect;
+}
+
+.copy {
+  position: relative;
+  max-width: 31rem;
+}
+
+.hero .logo {
+  margin: 0 0 20px;
+  font-size: clamp(16px, 1.8vw, 24px);
+}
+
+.lead {
+  margin: 0 0 28px;
+  font-size: 24px;
+  line-height: 1.35;
+}
+
+/* ---- Split download button ---- */
+.download {
+  position: relative;
+  display: inline-flex;
+  border-radius: 2px;
+  box-shadow: var(--shadow-float);
+}
+
+.download-main,
+.download-toggle {
+  display: inline-flex;
+  align-items: center;
+  border: 0;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.download-main {
+  gap: 10px;
+  padding: 14px 20px;
+  border-radius: 2px 0 0 2px;
+}
+
+.download-toggle {
+  padding: 0 14px;
+  border-left: 1px solid color-mix(in oklab, var(--on-accent) 35%, var(--accent));
+  border-radius: 0 2px 2px 0;
+}
+
+.download-main:hover,
+.download-toggle:hover { background: color-mix(in oklab, var(--accent) 88%, #000); }
+
+.download-main[aria-disabled="true"] {
+  background: var(--stone-3);
+  color: var(--ink-muted);
+  cursor: default;
+}
+
+a:focus-visible,
+button:focus-visible {
+  outline: 2px solid var(--accent-ink);
+  outline-offset: 2px;
+}
+
+.menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 2;
+  min-width: 100%;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  background: var(--stone-2);
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  box-shadow: var(--shadow-float);
+}
+
+.menu[hidden] { display: none; }
+
+.menu a,
+.menu span {
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 10px 12px;
+  color: var(--ink);
+  font-size: 12px;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.menu a:hover { background: var(--stone-3); }
+
+.menu span { color: var(--ink-muted); }
+
+.menu small {
+  font-family: var(--serif);
+  font-size: 14px;
+  font-style: italic;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--ink-muted);
+}
+
+.note {
+  margin: 16px 0 0;
+  color: var(--ink-muted);
+  font-size: 15px;
+}
+
+/* ---- Text sections: plain text on the marble, one per screen ---- */
+.legal {
+  display: grid;
+  grid-template-rows: 1fr auto;
+  place-items: center;
+  padding: 48px clamp(16px, 6vw, 96px);
+}
+
+.legal-body {
+  width: 100%;
+  max-width: 38rem;
+  font-size: 21px;
+}
+
+.legal h2 {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin: 0 0 24px;
+  color: var(--ink);
+  font-size: 26px;
+  letter-spacing: 0.12em;
+}
+
+/* Roman numeral, then a hairline. */
+.legal h2 span { color: var(--accent-ink); }
+
+.legal h2::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--line);
+}
+
+.legal p, .legal ul { margin: 0 0 14px; }
+
+.legal ul { padding-left: 22px; }
+
+.legal li { margin-bottom: 6px; }
+
+/* The one-line promise at the top of a section. */
+.legal .promise {
+  margin-bottom: 20px;
+  font-size: 1.4em;
+  font-style: italic;
+  line-height: 1.25;
+}
+
+/* Last row of the Privacy section, under its text. */
+footer {
+  align-self: end;
+  margin-top: 40px;
+  color: var(--ink-muted);
+  font-size: 14px;
+  font-style: italic;
+  text-align: center;
+}
+
+footer p { margin: 0; }
+
+/* ---- Phones: tabs on their own row, the app on top of the text ---- */
+@media (max-width: 800px) {
+  :root { --header-h: 132px; }
+
+  /* Two rows: logo and GitHub, then the tabs, with room between them. */
+  .bar {
+    flex-wrap: wrap;
+    gap: 10px 12px;
+    align-content: center;
+    padding: 0 12px;
+  }
+
+  .bar .logo { font-size: 11px; }
+
+  .source { margin-left: auto; }
+
+  .source span { display: none; }
+
+  .tabs {
+    order: 3;
+    justify-content: space-around;
+    width: 100%;
+    margin: 0;
+  }
+
+  .tabs a {
+    padding: 7px 6px;
+    font-size: 11px;
+    letter-spacing: 0.08em;
+  }
+
+  /* The hero is one screen plus --zoom-d of scroll. While it scrolls, the stage stays put: the app fades away, and
+     the logo and line grow and move to the top. Only transforms change, so no line ever rewraps. The script sets
+     --p (0 to 1), --s (scale of the titles), --copy-y and --titles-h. */
+  .hero {
+    --zoom-d: 50svh;
+    --media-h: min(100vw, 100svh - var(--header-h) - 280px);
+    display: block;
+    height: calc(100svh - var(--header-h) + var(--zoom-d));
+    padding: 0;
+  }
+
+  .stage {
+    position: sticky;
+    top: var(--header-h);
+    display: block;
+    height: calc(100svh - var(--header-h));
+    overflow: hidden;
+  }
+
+  /* Cut to a square, so the calendar stays readable. */
+  .media-box {
+    position: absolute;
+    top: 0;
+    right: 0;
+    left: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: auto;
+    height: var(--media-h);
+    aspect-ratio: auto;
+    overflow: hidden;
+    opacity: calc(1 - 1.6 * var(--p, 0));
+    transform: translateY(calc(-20% * var(--p, 0)));
+    mask-image: linear-gradient(to bottom, transparent, #000 10%, #000 85%, transparent);
+  }
+
+  .hero .media {
+    flex: none;
+    width: 100vw;
+    height: auto;
+    aspect-ratio: 1;
+    mask-image: none;
+  }
+
+  .snap-end {
+    position: absolute;
+    top: var(--zoom-d);
+    display: block;
+    width: 1px;
+    height: 1px;
+    scroll-snap-align: start;
+  }
+
+  .copy {
+    position: absolute;
+    top: 0;
+    right: 16px;
+    left: 16px;
+    max-width: none;
+    text-align: center;
+    transform: translateY(var(--copy-y, 0px));
+  }
+
+  /* Laid out at full size, shown smaller at the bottom. Scaling from the top center keeps the logo centered. The
+     button keeps its size and only follows the titles up. */
+  .titles {
+    transform: scale(var(--s, 1));
+    transform-origin: 50% 0;
+  }
+
+  .actions {
+    transform: translateY(calc((var(--s, 1) - 1) * var(--titles-h, 0px)));
+  }
+
+  /* The logo is about 14 em wide, so it never gets wider than the screen. */
+  .hero .logo {
+    margin: 0 auto 8px;
+    font-size: min(18px, (100vw - 32px) / 14.5);
+  }
+
+  .lead {
+    margin-bottom: 20px;
+    font-size: 22px;
+  }
+
+  .note { font-size: 14px; }
+
+  .legal { padding-bottom: 24px; }
+
+  .legal-body { font-size: 17px; }
+
+  .legal h2 { font-size: 20px; }
+}
+
+/* Very small phones: tighter tabs, so all three fit. */
+@media (max-width: 359px) {
+  .tabs a { padding: 7px 3px; font-size: 10px; letter-spacing: 0.03em; }
+}
+</style>
+</head>
+<body>
+<!-- The calendar mark of the logo (the app icon without its tile), drawn once and used twice. -->
+<svg width="0" height="0" style="position: absolute" aria-hidden="true"><symbol id="mark" viewBox="86 86 852 852"> <g fill="currentColor"> <path fill-rule="evenodd" d="M186 176H838A100 100 0 0 1 938 276V838A100 100 0 0 1 838 938H186A100 100 0 0 1 86 838V276A100 100 0 0 1 186 176ZM184 296H840A36 36 0 0 1 876 332V752A36 36 0 0 1 840 788H184A36 36 0 0 1 148 752V332A36 36 0 0 1 184 296Z"/> <rect x="282" y="86" width="84" height="180" rx="42"/><rect x="658" y="86" width="84" height="180" rx="42"/> </g> <text x="512" y="661.0" text-anchor="middle" font-family="Cinzel, serif" font-weight="700" font-size="340" letter-spacing="13.6" fill="currentColor">XII</text> <text x="512" y="892.4" text-anchor="middle" font-family="Cinzel, serif" font-weight="700" font-size="84" letter-spacing="10.08" fill="var(--mark-tie)">B·P</text> </symbol></svg>
+
+<header>
+  <div class="bar">
+    <a class="logo" href="#download"><svg aria-hidden="true"><use href="#mark"/></svg><span class="logo-name">Busy Peasy</span></a>
+    <nav class="tabs" aria-label="Sections">
+      <a class="caps" href="#download">Download</a>
+      <a class="caps" href="#features">Features</a>
+      <a class="caps" href="#privacy">Privacy</a>
+    </nav>
+    <a class="source caps" href="https://github.com/raythurnvoid/busy-peasy" aria-label="Source code on GitHub">
+      <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0c4.42 0 8 3.58 8 8a8.013 8.013 0 0 1-5.45 7.59c-.4.08-.55-.17-.55-.38 0-.27.01-1.13.01-2.2 0-.75-.25-1.23-.54-1.48 1.78-.2 3.65-.88 3.65-3.95 0-.88-.31-1.59-.82-2.15.08-.2.36-1.02-.08-2.12 0 0-.67-.22-2.2.82-.64-.18-1.32-.27-2-.27-.68 0-1.36.09-2 .27-1.53-1.03-2.2-.82-2.2-.82-.44 1.1-.16 1.92-.08 2.12-.51.56-.82 1.28-.82 2.15 0 3.06 1.86 3.75 3.64 3.95-.23.2-.44.55-.51 1.07-.46.21-1.61.55-2.33-.66-.15-.24-.6-.83-1.23-.82-.67.01-.27.38.01.53.34.19.73.9.82 1.13.16.45.68 1.31 2.69.94 0 .67.01 1.3.01 1.49 0 .21-.15.45-.55.38A7.995 7.995 0 0 1 0 8c0-4.42 3.58-8 8-8Z"/></svg>
+      <span>Source code</span>
+    </a>
+  </div>
+  <div class="moulding" aria-hidden="true"></div>
+</header>
+
+<main>
+  <section class="snap hero" id="download">
+    <!-- On phones the stage stays put while the scroll zooms the text in. -->
+    <div class="stage">
+      <!-- The app with fake events, until the promo video is ready. -->
+      <div class="media-box">
+        <img class="media" src="app.webp" width="1348" height="1000" alt="Busy Peasy showing a week of Google and Microsoft 365 events">
+      </div>
+      <div class="copy">
+        <div class="titles">
+          <h1 class="logo"><svg aria-hidden="true"><use href="#mark"/></svg><span class="logo-name">Busy Peasy</span></h1>
+          <p class="lead">All your Google and Microsoft 365 calendars in one app, with reminders you can't miss.</p>
+        </div>
+
+        <div class="actions">
+          <div class="download">
+            <a class="download-main caps" id="download-main" href="https://github.com/raythurnvoid/busy-peasy/releases/latest">Download for Windows</a>
+            <button class="download-toggle" id="download-toggle" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="download-menu" aria-label="Other platforms">
+              <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M2.5 4.5 6 8l3.5-3.5" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
+            </button>
+            <ul class="menu" id="download-menu" role="menu" hidden></ul>
+          </div>
+          <p class="note">Free. Your calendars stay on your computer.</p>
+        </div>
+      </div>
+    </div>
+    <div class="snap-end" aria-hidden="true"></div>
+  </section>
+
+  <section class="snap legal" id="features">
+    <div class="legal-body">
+      <h2 class="caps"><span>I</span>Features</h2>
+      <p class="promise">Every calendar, one place.</p>
+      <ul>
+        <li>Google and Microsoft 365 accounts side by side, as many as you need.</li>
+        <li>Day, Week, Month and Schedule views, and search.</li>
+        <li>Reminders you can't miss: a window comes up on top of your apps, with a Join button for calls.</li>
+        <li>Add, move and change events, invite people, and answer invites.</li>
+        <li>Your AI agents, like Claude Code and Codex, can read and plan your calendar, only if you allow them.</li>
+        <li>Lives in the tray and starts with Windows.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="snap legal" id="privacy">
+    <div class="legal-body">
+      <h2 class="caps"><span>II</span>Privacy</h2>
+      <p class="promise">Your calendars stay yours.</p>
+      <ul>
+        <li>Your calendars are saved on your computer. There is no account with us.</li>
+        <li>Busy Peasy talks only to Google and Microsoft, to sync the calendars you connect, and to GitHub, to check for updates.</li>
+        <li>Agent access is off until you turn it on, and each new agent asks you first.</li>
+        <li>No tracking, no ads, and no cookies on this site.</li>
+      </ul>
+    </div>
+    <footer>
+      <p>Busy Peasy · Made by Daniele Loreto (<a href="https://www.linkedin.com/in/ray-thurn-void">LinkedIn</a>, <a href="https://x.com/raythurnvoid">X</a>) · <a href="https://github.com/raythurnvoid/busy-peasy">Source code on GitHub</a></p>
+    </footer>
+  </section>
+</main>
+
+<script>
+const REPO = "raythurnvoid/busy-peasy";
+const RELEASES_PAGE = `https://github.com/${REPO}/releases/latest`;
+
+// Which installer file belongs to which platform.
+const PLATFORMS = [
+  { id: "windows", label: "Windows", match: /\.exe$/i },
+  { id: "mac", label: "macOS", match: /\.dmg$/i },
+  { id: "linux", label: "Linux", match: /\.(AppImage|deb)$/i },
+];
+
+// Until the release is read, Windows links to the releases page.
+const urls = { windows: RELEASES_PAGE };
+
+const ua = navigator.userAgent.toLowerCase();
+const isPhone = /android|iphone|ipad/.test(ua);
+
+function detectPlatform() {
+  // Phones have no build, so they get Windows (the only one today).
+  if (isPhone) return "windows";
+  const platform = (navigator.userAgentData?.platform || ua).toLowerCase();
+  if (platform.includes("mac")) return "mac";
+  if (platform.includes("linux") || platform.includes("x11") || platform.includes("cros")) return "linux";
+  return "windows";
+}
+
+const detected = detectPlatform();
+const main = document.getElementById("download-main");
+const toggle = document.getElementById("download-toggle");
+const menu = document.getElementById("download-menu");
+
+function render() {
+  const current = PLATFORMS.find((p) => p.id === detected);
+  if (urls[detected]) {
+    main.href = urls[detected];
+    main.textContent = `Download for ${current.label}`;
+    main.removeAttribute("aria-disabled");
+  } else {
+    main.removeAttribute("href");
+    main.textContent = `${current.label}: coming soon`;
+    main.setAttribute("aria-disabled", "true");
+  }
+
+  menu.replaceChildren(...PLATFORMS.map((p) => {
+    const li = document.createElement("li");
+    li.setAttribute("role", "none");
+    const item = document.createElement(urls[p.id] ? "a" : "span");
+    item.className = "caps";
+    item.setAttribute("role", "menuitem");
+    item.textContent = p.label;
+    const hint = document.createElement("small");
+    if (urls[p.id]) {
+      item.href = urls[p.id];
+      hint.textContent = p.id === detected && !isPhone ? "your system" : "";
+    } else {
+      item.setAttribute("aria-disabled", "true");
+      hint.textContent = "coming soon";
+    }
+    item.append(hint);
+    li.append(item);
+    return li;
+  }));
+}
+
+function setMenu(open) {
+  menu.hidden = !open;
+  toggle.setAttribute("aria-expanded", String(open));
+  if (open) menu.querySelector("a")?.focus();
+}
+
+toggle.addEventListener("click", () => setMenu(menu.hidden));
+
+document.addEventListener("click", (event) => {
+  if (!menu.hidden && !event.target.closest(".download")) setMenu(false);
+});
+
+document.addEventListener("keydown", (event) => {
+  if (menu.hidden) return;
+  if (event.key === "Escape") {
+    setMenu(false);
+    toggle.focus();
+  }
+  if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+    event.preventDefault();
+    const links = [...menu.querySelectorAll("a")];
+    const index = links.indexOf(document.activeElement);
+    const next = event.key === "ArrowDown" ? index + 1 : index - 1;
+    links[(next + links.length) % links.length]?.focus();
+  }
+});
+
+render();
+
+// Read the latest release to link the installer files directly.
+fetch(`https://api.github.com/repos/${REPO}/releases/latest`)
+  .then((response) => (response.ok ? response.json() : Promise.reject(response.status)))
+  .then((release) => {
+    for (const p of PLATFORMS) {
+      const asset = release.assets.find((a) => p.match.test(a.name));
+      if (asset) urls[p.id] = asset.browser_download_url;
+    }
+    render();
+  })
+  .catch(() => {});
+
+// The tab of the section in the middle of the screen is the active one.
+const tabs = [...document.querySelectorAll(".tabs a")];
+const observer = new IntersectionObserver((entries) => {
+  for (const entry of entries) {
+    if (!entry.isIntersecting) continue;
+    for (const tab of tabs) {
+      tab.setAttribute("aria-current", String(tab.hash === `#${entry.target.id}`));
+    }
+  }
+}, { rootMargin: "-50% 0px -50% 0px" });
+document.querySelectorAll(".snap").forEach((section) => observer.observe(section));
+
+// Phones: the hero zoom (see .hero in the CSS). At the start the titles are small and the text sits at the bottom of
+// the stage; at the end they are full size and the text sits at the top.
+const hero = document.getElementById("download");
+const stage = hero.querySelector(".stage");
+const copy = hero.querySelector(".copy");
+const titles = hero.querySelector(".titles");
+const phone = matchMedia("(max-width: 800px)");
+const START_SCALE = 0.68;
+const EDGE = 24;
+
+function updateZoom() {
+  if (!phone.matches) {
+    for (const name of ["--p", "--s", "--copy-y", "--titles-h"]) hero.style.removeProperty(name);
+    return;
+  }
+  const distance = hero.offsetHeight - stage.offsetHeight;
+  const p = Math.min(Math.max(scrollY / distance, 0), 1);
+  const scale = START_SCALE + (1 - START_SCALE) * p;
+  // Transforms don't change these sizes, so they are the full-size ones.
+  const titlesHeight = titles.offsetHeight;
+  const startHeight = copy.offsetHeight - (1 - START_SCALE) * titlesHeight;
+  const startY = Math.max(EDGE, stage.offsetHeight - EDGE - startHeight);
+  hero.style.setProperty("--p", p.toFixed(3));
+  hero.style.setProperty("--s", scale.toFixed(3));
+  hero.style.setProperty("--copy-y", `${(startY + (EDGE - startY) * p).toFixed(1)}px`);
+  hero.style.setProperty("--titles-h", `${titlesHeight}px`);
+}
+
+addEventListener("scroll", () => requestAnimationFrame(updateZoom), { passive: true });
+addEventListener("resize", updateZoom);
+updateZoom();
+</script>
+</body>
+</html>
