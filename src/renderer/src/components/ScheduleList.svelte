@@ -33,13 +33,12 @@
   let now = $state(new Date())
   let root: HTMLDivElement | undefined = $state()
 
-  // Search: focus the first event from today on (else the last day's), in the middle of the list, like Google.
-  export function focusToday(): void {
+  // Search: scroll the first event from today on (else the last day's) to the middle of the list, like Google. No
+  // focus: it stays in the search box.
+  export function scrollToToday(): void {
     const groups = [...root!.querySelectorAll<HTMLElement>('.day')]
     const group = groups.find((g) => Number(g.dataset.day) >= startOfDay(now).getTime()) ?? groups.at(-1)
-    const row = group?.querySelector<HTMLElement>('.event')
-    row?.focus()
-    row?.scrollIntoView({ block: 'center' })
+    group?.querySelector<HTMLElement>('.event')?.scrollIntoView({ block: 'center' })
   }
 
   // Delete: the row goes away, so focus moves to the next row (else the one before, else the list), not to the page.

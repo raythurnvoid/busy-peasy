@@ -1,5 +1,6 @@
 import { app, Menu, nativeImage, Tray } from 'electron'
 import icon from '../../resources/icon.png?asset'
+import trayIcon from '../../resources/tray.ico?asset'
 import type { Account } from '../shared/api'
 import type { AgentAccess } from '../shared/approval'
 import { AGENT_ACCESS_LABELS, AGENT_LEVEL_LABELS, type Agent } from './agent'
@@ -25,7 +26,8 @@ export function createTray(actions: {
   removeAgent(id: string): void
   quit(): void
 }): { showSignedOut(signedOut: Account[]): void; showUpdate(version: string): void; showAgents(): void } {
-  tray = new Tray(nativeImage.createFromPath(icon).resize({ width: 16, height: 16 }))
+  // Windows: the ICO has the simpler small drawing at 16 to 32 px, and Windows picks the size for the screen scaling.
+  tray = new Tray(process.platform === 'win32' ? trayIcon : nativeImage.createFromPath(icon).resize({ width: 16, height: 16 }))
   tray.setToolTip('Busy Peasy')
   let signedOut: Account[] = []
   let update: string | null = null

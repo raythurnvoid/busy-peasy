@@ -404,8 +404,9 @@
     void tick().then(() => searchBox?.focus())
   }
 
-  // focus: after Enter, move to the result closest to today. Re-runs after a sync keep focus where it is.
-  async function runSearch(text: string, focus = false): Promise<void> {
+  // scroll: after Enter, scroll to the result closest to today. Focus stays in the box, so Ctrl+A selects its text,
+  // not the page. Re-runs after a sync keep the scroll where it is.
+  async function runSearch(text: string, scroll = false): Promise<void> {
     const result = await window.api.searchEvents(text).catch((e: unknown) => showNote(errorMessage(e)))
     // Ignore an answer for a search the user already left or replaced.
     if (!result || search?.ran !== text) return
@@ -413,8 +414,7 @@
     search.more = result.more
     const open = selected
     if (open) open.event = result.events.find((e) => e.id === open.event.id) ?? open.event
-    // With no results focus stays in the box, like Google.
-    if (focus) void tick().then(() => results?.focusToday())
+    if (scroll) void tick().then(() => results?.scrollToToday())
   }
 
   // Back to the view as it was, like Google's "Go back".
@@ -1042,6 +1042,10 @@
           </button>
         {/if}
       </form>
+      <!-- Leaves search, like Go back and Esc. The X in the box only clears the text. -->
+      <button class="icon-btn close-search" aria-label="Close search" title="Close search (Esc)" onclick={closeSearch}>
+        <svg viewBox="0 0 24 24"><path d="M19 6.4 17.6 5 12 10.6 6.4 5 5 6.4l5.6 5.6L5 17.6 6.4 19l5.6-5.6 5.6 5.6 1.4-1.4-5.6-5.6z" /></svg>
+      </button>
     {:else}
       <div class="brand">Busy Peasy</div>
       <button class="pill-btn" title="Today (t)" onclick={goToday}>Today</button>
@@ -1371,7 +1375,7 @@
     inset-inline-end: 2px;
   }
 
-  /* The top bar's bottom edge, as wide as the card below it. Its buttons are centered, so it covers none of them. */
+  /* The top bar's bottom edge, as wide as the card below it. The bar's bottom padding keeps its buttons above it. */
   .moulding {
     grid-column: 3;
     grid-row: 1;
@@ -1380,14 +1384,15 @@
     pointer-events: none;
   }
 
-  /* Rows set by hand: the moulding shares row 1, so auto placement would push the bar down. */
+  /* Rows set by hand: the moulding shares row 1, so auto placement would push the bar down. The bottom padding is the
+     moulding's height and margin, so the buttons and their focus rings stay above it. */
   .top {
     grid-row: 1;
     grid-column: 1 / -1;
     display: flex;
     align-items: center;
     gap: 0.25rem;
-    padding: 0 1rem;
+    padding: 0 1rem 1rem;
   }
 
   /* Wide enough that Today starts above the card. In a narrow window it shrinks and wraps first. */
@@ -1420,8 +1425,8 @@
     align-items: center;
     gap: 0.5rem;
     max-width: 40rem;
-    height: 3rem;
-    margin-right: auto;
+    /* As tall as Today: a taller box runs over the moulding under the bar. */
+    height: 2.5rem;
     padding: 0 0.25rem 0 1rem;
     border: 1px solid var(--line);
     border-radius: var(--radius);
@@ -1452,10 +1457,17 @@
     outline: 2px solid var(--accent);
   }
 
+  /* Next to the box; the free space goes after it, so Settings stays at the end. */
+  .close-search {
+    margin-right: auto;
+  }
+
   /* Cuts the title and its rules in a narrow window, so they never run over the view buttons. */
   .title {
     flex: 1;
     margin: 0 0 0 0.75rem;
+    /* Room for the first title rule's diamond, which sticks out 3px to the left and would be clipped. */
+    padding-left: 3px;
     font-size: 1.25rem;
     line-height: 1.75rem;
     overflow: hidden;
