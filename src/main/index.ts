@@ -39,13 +39,20 @@ let agent: ReturnType<typeof startAgent> | undefined
 let lastFocusSync = 0
 let quitting = false
 let flushed = false
-// Set by the tray's restart item or the page's update banner: this quit installs the downloaded update and starts the
+// Set by the tray's restart item or the page's update card: this quit installs the downloaded update and starts the
 // app again.
 let restartToUpdate = false
 
 // Same as --stone-1 in renderer/src/styles/palazzo-core.css (the shell), so the window never shows white before the
 // page paints.
 const background = (): string => (nativeTheme.shouldUseDarkColors ? '#1c150f' : '#f6efe3')
+// The Windows buttons over the page's top bar. Clear, so the page shows under them. The symbols use --ink-muted, like
+// the bar's own icons. 48 px: the height of the bar's row without its bottom padding (App.svelte .top), so they line up.
+const titleBarOverlay = (): Electron.TitleBarOverlayOptions => ({
+  color: '#00000000',
+  symbolColor: nativeTheme.shouldUseDarkColors ? '#b39e86' : '#76624f',
+  height: 48
+})
 
 function createMainWindow(show: boolean): void {
   mainWindow = new BrowserWindow({
@@ -54,6 +61,10 @@ function createMainWindow(show: boolean): void {
     minWidth: 720,
     minHeight: 480,
     show: false,
+    // No title bar: the page's top bar moves the window (App.svelte), like Only Whispers. Windows still draws its own
+    // minimize, maximize and close buttons, so the snap layouts menu on the maximize button still works.
+    titleBarStyle: 'hidden',
+    titleBarOverlay: titleBarOverlay(),
     autoHideMenuBar: true,
     backgroundColor: background(),
     ...(process.platform === 'linux' ? { icon } : {}),
@@ -206,7 +217,7 @@ if (!app.requestSingleInstanceLock()) {
     })
     enableStartAtLoginOnce(listAccounts(db).length === 0)
     const reminders = startReminders(db, devUrl)
-    // The tray item and the page's update banner.
+    // The tray item and the page's update card.
     const restartAndUpdate = (): void => {
       restartToUpdate = true
       app.quit()
@@ -296,7 +307,10 @@ if (!app.requestSingleInstanceLock()) {
 
     app.on('activate', showMainWindow)
     // The main window lives for days in the tray, and Windows can switch light/dark meanwhile.
-    nativeTheme.on('updated', () => mainWindow?.setBackgroundColor(background()))
+    nativeTheme.on('updated', () => {
+      mainWindow?.setBackgroundColor(background())
+      mainWindow?.setTitleBarOverlay(titleBarOverlay())
+    })
   })
 
   // Quit closes the page first, so it sends a delete or "No" still in its Undo time, and waits for it (10 s at most).

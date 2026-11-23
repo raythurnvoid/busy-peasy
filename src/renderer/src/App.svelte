@@ -141,7 +141,7 @@
   let deleting: number[] = $state([])
   // undo: what the Undo button does. null: no Undo button.
   let toast: { text: string; undo: (() => void) | null } | null = $state(null)
-  // A downloaded update's version, for the update banner. Close hides it until the next download.
+  // A downloaded update's version, for the update card. Close hides it until the next download.
   let appUpdate: string | null = $state(null)
   // Dragged events, shown at their new times while the write runs. They replace the stored copy, so a failed write
   // just drops them.
@@ -280,7 +280,7 @@
     })
   })
 
-  // Like Only Whispers: a downloaded update installs on quit anyway, and the banner offers a restart now. Asked at the
+  // Like Only Whispers: a downloaded update installs on quit anyway, and the card offers a restart now. Asked at the
   // start too: the update may have come before this page.
   $effect(() => {
     void window.api.getUpdate().then((version) => (appUpdate = version))
@@ -1103,23 +1103,6 @@
         </button>
       </div>
     {/each}
-    {#if appUpdate}
-      <div class="banner update" role="status">
-        <span>
-          Busy Peasy {appUpdate} is ready. It installs when you quit, or now with a restart.
-        </span>
-        <button class="pill-btn" onclick={() => void window.api.installUpdate()}>
-          Restart to update
-        </button>
-        <button class="toast-btn close" aria-label="Close" onclick={() => (appUpdate = null)}>
-          <svg viewBox="0 0 24 24"
-            ><path
-              d="M19 6.4 17.6 5 12 10.6 6.4 5 5 6.4l5.6 5.6L5 17.6 6.4 19l5.6-5.6 5.6 5.6 1.4-1.4-5.6-5.6z"
-            /></svg
-          >
-        </button>
-      </div>
-    {/if}
     <!-- Always here, so a screen reader reads the text when it comes. -->
     <div class="note-bar" role="status">{#if outside && synced}Only events from {syncedText(synced)} are synced. Days outside these dates show no events.{/if}</div>
     <div class="sr-only" role="status">{#if colorSaved}Event saved{/if}</div>
@@ -1356,6 +1339,18 @@
   </div>
 {/if}
 
+{#if appUpdate}
+  <!-- Like Only Whispers: a card at the bottom right with no timer. Above a toast, which can be as wide as the window. -->
+  <div class="update-card pz-panel" class:above-toast={toast} role="status">
+    <p class="update-title">Busy Peasy {appUpdate} is ready</p>
+    <p class="update-text">It installs when you quit, or now with a restart.</p>
+    <button class="update-btn" onclick={() => void window.api.installUpdate()}>Restart to update</button>
+    <button class="update-close" aria-label="Close" onclick={() => (appUpdate = null)}>
+      <svg viewBox="0 0 24 24"><path d="M19 6.4 17.6 5 12 10.6 6.4 5 5 6.4l5.6 5.6L5 17.6 6.4 19l5.6-5.6 5.6 5.6 1.4-1.4-5.6-5.6z" /></svg>
+    </button>
+  </div>
+{/if}
+
 <style>
   /* The middle 2rem track holds the column, so it never covers the sidebar or the card. */
   .shell {
@@ -1393,6 +1388,29 @@
     align-items: center;
     gap: 0.25rem;
     padding: 0 1rem 1rem;
+    /* The window has no title bar (main/index.ts): this bar moves it, and a double click maximizes. Windows draws its own
+       minimize, maximize and close buttons over the right end, so the bar stops before them. */
+    padding-right: calc(100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width, 100vw) + 1rem);
+    -webkit-app-region: drag;
+  }
+
+  /* Else a click on them would move the window. */
+  .top :is(button, input) {
+    -webkit-app-region: no-drag;
+  }
+
+  /* A dialog or a popover's backdrop covers the bar, but the drag area still wins over it: a click there must close
+     them, not move the window. */
+  :global(body:has(dialog:modal, .backdrop)) .top {
+    -webkit-app-region: no-drag;
+  }
+
+  /* A narrow window has no room for everything: the name goes, so the bar's buttons are not cut. The period title is
+     gone by then too. */
+  @media (max-width: 51rem) {
+    .brand {
+      display: none;
+    }
   }
 
   /* Wide enough that Today starts above the card. In a narrow window it shrinks and wraps first. */
@@ -1473,6 +1491,17 @@
     overflow: hidden;
   }
 
+  /* With little room the rules get shorter first (down to their diamonds). The period keeps its width, and is cut
+     only when it is wider than the whole title. */
+  .title .pz-title-rule {
+    flex-shrink: 1;
+  }
+
+  .title > span:not(.pz-title-rule) {
+    flex-shrink: 0;
+    max-width: 100%;
+  }
+
   /* Never squeezed: Cinzel labels are wide, and a cut view button is unusable. */
   .views {
     flex: none;
@@ -1527,18 +1556,6 @@
 
   .banner span {
     flex: 1;
-  }
-
-  /* Good news, not a problem: the accent instead of the danger colors. */
-  .banner.update {
-    border-bottom-color: color-mix(in oklab, var(--accent) 30%, var(--line));
-    background: var(--accent-wash);
-    color: var(--ink);
-  }
-
-  /* Its close sits at the banner's edge, not pulled in like a toast's. */
-  .banner .close {
-    margin: 0 -0.5rem 0 -0.5rem;
   }
 
   .note-bar {
@@ -1611,11 +1628,125 @@
     fill: currentColor;
   }
 
+  /* The sizes and colors of Only Whispers' toast (Toast.tsx), which uses the same Palazzo tokens. Slides in from the
+     right like it. */
+  .update-card {
+    position: fixed;
+    right: 1.25rem;
+    bottom: 1.25rem;
+    z-index: 20;
+    width: 18.75rem;
+    padding: 0.625rem 0.5rem 0.625rem 0.75rem;
+    color: var(--on-surface);
+    line-height: 1.375;
+    box-shadow: var(--shadow-float);
+    animation: update-enter 300ms ease-out;
+  }
+
+  .update-card.above-toast {
+    bottom: 6rem;
+  }
+
+  .update-title {
+    margin: 0;
+    font-size: 13.5px;
+  }
+
+  .update-text {
+    margin: 0.125rem 0 0;
+    color: var(--on-surface-variant);
+    font-size: 12px;
+  }
+
+  /* Only Whispers' small toast button, not the app's big pill. */
+  .update-btn {
+    margin-top: 0.5rem;
+    padding: 0.25rem 0.625rem;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--stone-1);
+    color: var(--on-surface);
+    font-family: var(--font-family-display);
+    font-size-adjust: none;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background-color 0.15s;
+  }
+
+  .update-btn:hover {
+    background: var(--stone-3);
+  }
+
+  /* A round X on the top left corner, like Only Whispers. It grows in on hover, and on focus for the keyboard. */
+  .update-close {
+    position: absolute;
+    top: -0.5rem;
+    left: -0.5rem;
+    display: grid;
+    place-items: center;
+    width: 1.5rem;
+    height: 1.5rem;
+    padding: 0;
+    border: 1px solid var(--line);
+    border-radius: 50%;
+    background: var(--stone-2);
+    color: var(--on-surface-variant);
+    box-shadow: var(--shadow-float);
+    cursor: pointer;
+    opacity: 0;
+    transform: scale(0.75);
+    transition:
+      opacity 0.15s,
+      transform 0.15s,
+      background-color 0.15s,
+      color 0.15s;
+  }
+
+  .update-card:hover .update-close,
+  .update-card:focus-within .update-close {
+    opacity: 1;
+    transform: none;
+  }
+
+  .update-close:hover {
+    background: var(--stone-3);
+    color: var(--on-surface);
+  }
+
+  .update-close svg {
+    width: 0.75rem;
+    height: 0.75rem;
+    fill: currentColor;
+  }
+
+  @keyframes update-enter {
+    from {
+      opacity: 0;
+      transform: translateX(1rem) scale(0.98);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .update-card {
+      animation: none;
+    }
+
+    .update-close {
+      transform: none;
+    }
+  }
+
   @media (forced-colors: active) {
     .views,
     .search,
     .note-bar,
-    .toast {
+    .toast,
+    .update-card,
+    .update-btn {
       border: 1px solid CanvasText;
     }
 
