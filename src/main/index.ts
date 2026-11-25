@@ -158,8 +158,8 @@ async function screenshot(): Promise<string> {
 // A new agent asks for access: a prompt in the page (AgentApproval.svelte). Agents cannot answer it: agent.ts refuses
 // their page input while it is open, the prompt takes only the user's own input, and ipc.ts checks the answer. The
 // window comes up without the focus (a minimized one stays minimized: restore() would take the focus) and flashes, so
-// keys the user types elsewhere stay there. Hiding the window is Not now: else the prompt would block every agent's
-// page input until the user opens the window again.
+// keys the user types elsewhere stay there. Hiding the window leaves the prompt open: the user sees it again with the
+// window.
 async function askToAllowAgent(request: ApprovalRequest, signal: AbortSignal): Promise<ApprovalAnswer> {
   const window = mainWindow
   if (!window || quitting) return null
@@ -168,16 +168,7 @@ async function askToAllowAgent(request: ApprovalRequest, signal: AbortSignal): P
     window.flashFrame(true)
     window.once('focus', () => window.flashFrame(false))
   }
-  const local = new AbortController()
-  const close = (): void => local.abort()
-  signal.addEventListener('abort', close)
-  window.once('hide', close)
-  try {
-    return await askApproval(window.webContents, request, local.signal)
-  } finally {
-    signal.removeEventListener('abort', close)
-    if (!window.isDestroyed()) window.off('hide', close)
-  }
+  return askApproval(window.webContents, request, signal)
 }
 
 // Chromium shows the page to Windows UI Automation only for screen readers it knows, so other UIA tools (agents, test

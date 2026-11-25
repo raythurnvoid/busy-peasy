@@ -1,5 +1,5 @@
 import type { Api, CalendarEvent, DataChanged } from '../shared/api'
-import type { ApprovalAnswer, ApprovalRequest } from '../shared/approval'
+import type { AgentAccess, ApprovalRequest } from '../shared/approval'
 
 declare global {
   interface Window {
@@ -10,7 +10,7 @@ declare global {
       onUpdateReady(callback: (version: string) => void): () => void
       onAgentCommand(callback: (name: string, args: Record<string, unknown>) => Promise<unknown>): () => void
       onAgentApproval(callback: (request: ApprovalRequest | null) => void): () => void
-      answerAgentApproval(id: string, answer: ApprovalAnswer): void
+      answerAgentApproval(id: string, answer: AgentAccess): void
     }
   }
 }

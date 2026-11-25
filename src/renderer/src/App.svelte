@@ -1282,10 +1282,7 @@
   {#key approval.id}
     <AgentApproval
       request={approval}
-      onanswer={(answer) => {
-        window.api.answerAgentApproval(approval!.id, answer)
-        approval = null
-      }}
+      onanswer={(answer) => window.api.answerAgentApproval(approval!.id, answer)}
     />
   {/key}
 {/if}

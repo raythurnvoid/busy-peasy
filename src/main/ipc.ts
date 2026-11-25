@@ -1,6 +1,6 @@
 import { BrowserWindow, ipcMain, type WebContents } from 'electron'
 import type { Api, DataChanged } from '../shared/api'
-import { APPROVAL_ARM_MS, APPROVAL_MAX_MS, type ApprovalAnswer, type ApprovalRequest } from '../shared/approval'
+import { APPROVAL_ARM_MS, type AgentAccess, type ApprovalAnswer, type ApprovalRequest } from '../shared/approval'
 import { isAppOrigin } from './security'
 
 // An agent command waits this long for the page.
@@ -72,7 +72,7 @@ export function registerApi(api: Api, devUrl: string | undefined): void {
   ipcMain.on('agent-approval-answer', (event, id: unknown, answer: unknown) => {
     const origin = event.senderFrame?.origin ?? 'null'
     if (!approval || event.sender !== approval.contents || origin === 'null' || !isAppOrigin(origin, devUrl)) return
-    if (id !== approval.request.id || !['off', 'read', 'full', null].includes(answer as ApprovalAnswer)) return
+    if (id !== approval.request.id || !['off', 'read', 'full'].includes(answer as AgentAccess)) return
     if (Date.now() - approval.sentAt < APPROVAL_ARM_MS) return
     approval.done(answer as ApprovalAnswer)
   })
@@ -84,27 +84,24 @@ function sendApproval(): void {
   approval.contents.send('agent-approval', approval.request)
 }
 
-// Shows the prompt that asks the user to allow a new agent (AgentApproval.svelte) and returns the answer. null: Not
-// now, or the signal closed the prompt, or the page is gone, or nobody answered within APPROVAL_MAX_MS. One at a time:
-// agent.ts asks in turn.
+// Shows the prompt that asks the user to allow a new agent (AgentApproval.svelte) and returns the answer. null: the
+// signal closed the prompt, or the page is gone. It has no time limit and no Not now: only the user answers it. One at
+// a time: agent.ts asks in turn.
 export function askApproval(contents: WebContents, request: ApprovalRequest, signal: AbortSignal): Promise<ApprovalAnswer> {
   return new Promise((resolve) => {
     const done = (answer: ApprovalAnswer): void => {
       approval = null
-      clearTimeout(timer)
       signal.removeEventListener('abort', closed)
       contents.off('destroyed', closed)
+      if (!contents.isDestroyed()) contents.send('agent-approval', null)
       resolve(answer)
     }
     const closed = (): void => {
       done(null)
-      if (!contents.isDestroyed()) contents.send('agent-approval', null)
     }
     approval = { request, contents, sentAt: 0, done }
     signal.addEventListener('abort', closed)
     contents.once('destroyed', closed)
-    // A prompt nobody answers must not block page input for ever. The agent is asked again at a later call (agent.ts).
-    const timer = setTimeout(closed, APPROVAL_MAX_MS)
     // A page that is not listening yet gets it on agent-approval-ready.
     sendApproval()
   })

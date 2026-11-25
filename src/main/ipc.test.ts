@@ -139,9 +139,11 @@ describe('askApproval', () => {
     vi.advanceTimersByTime(999)
     prompt.answer('a1', 'full')
     expect(await prompt.answered()).toBe('none')
+    expect(prompt.contents.send).not.toHaveBeenCalledWith('agent-approval', null)
     vi.advanceTimersByTime(1)
     prompt.answer('a1', 'full')
     expect(await prompt.answered()).toBe('full')
+    expect(prompt.contents.send).toHaveBeenLastCalledWith('agent-approval', null)
   })
 
   it('ignores an answer for another agent, from another page or origin, or with a wrong value', async () => {
@@ -152,9 +154,11 @@ describe('askApproval', () => {
     prompt.answer('a1', 'full', { senderFrame: { origin: 'https://example.com' } })
     prompt.answer('a1', 'full', { senderFrame: { origin: 'null' } })
     prompt.answer('a1', 'admin')
-    expect(await prompt.answered()).toBe('none')
+    // The prompt has no Not now: the page cannot close it without a level.
     prompt.answer('a1', null)
-    expect(await prompt.answered()).toBe(null)
+    expect(await prompt.answered()).toBe('none')
+    prompt.answer('a1', 'off')
+    expect(await prompt.answered()).toBe('off')
   })
 
   it('closes on abort, and a late answer finds nothing', async () => {
@@ -168,13 +172,13 @@ describe('askApproval', () => {
     expect(await prompt.answered()).toBe(null)
   })
 
-  it('closes as Not now after 2 minutes without an answer', async () => {
+  it('stays open until the user answers, however long it takes', async () => {
     const prompt = open()
-    vi.advanceTimersByTime(2 * 60_000 - 1)
+    vi.advanceTimersByTime(24 * 60 * 60_000)
     expect(await prompt.answered()).toBe('none')
-    vi.advanceTimersByTime(1)
-    expect(await prompt.answered()).toBe(null)
-    expect(prompt.contents.send).toHaveBeenLastCalledWith('agent-approval', null)
+    expect(prompt.contents.send).not.toHaveBeenCalledWith('agent-approval', null)
+    prompt.answer('a1', 'full')
+    expect(await prompt.answered()).toBe('full')
   })
 
   it('answers Not now when the page is gone', async () => {

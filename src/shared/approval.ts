@@ -4,12 +4,11 @@
 // Keys answer only after the window has had the focus this long: keys that were already on their way, or that the
 // user was typing elsewhere, must not answer. Main also ignores an answer that comes sooner after it sent the prompt.
 export const APPROVAL_ARM_MS = 1000
-// Nobody answered in this time: main closes the prompt as Not now.
-export const APPROVAL_MAX_MS = 2 * 60_000
 
 // The tray's Agent access, and the level the user gives an agent.
 export type AgentAccess = 'off' | 'read' | 'full'
-// null: Not now.
+// null: the prompt closed without an answer (the user answered in the tray or removed the agent, agent access was
+// turned off, or the app quit).
 export type ApprovalAnswer = AgentAccess | null
 
 export interface ApprovalRequest {
@@ -18,6 +17,7 @@ export interface ApprovalRequest {
   // Another agent has the same name, so this one got " (2)".
   twin: boolean
   trayAccess: AgentAccess
+  upgrade?: boolean
 }
 
 // What agents get while a prompt is open (main/agent.ts, and App.svelte behind it).
@@ -45,12 +45,15 @@ export function approvalText(request: ApprovalRequest): { title: string; lines: 
       'like you. Allow it only if you just started this agent.'
   ]
   if (request.twin) {
-    lines.push(`Busy Peasy already has an agent named "${baseName(request.name)}". If you did not start a second copy of it, click Deny.`)
+    lines.push(`Busy Peasy already has an agent named "${baseName(request.name)}". If you did not start a second copy of it, click ${request.upgrade ? 'Keep read only' : 'Deny'}.`)
   }
   if (request.trayAccess === 'read') {
     lines.push('Agent access in the tray is Read only, so every agent can only read until you change it there.')
   }
-  return { title: `Allow "${request.name}" to use Busy Peasy?`, lines }
+  const title = request.upgrade
+    ? `Give "${request.name}" full access to change your calendar?`
+    : `Allow "${request.name}" to use Busy Peasy?`
+  return { title, lines }
 }
 
 // App.svelte wraps its whole agent command handler in this, so the check comes first: while a prompt is open, only

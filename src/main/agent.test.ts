@@ -132,6 +132,12 @@ afterEach(() => {
 })
 
 describe('startAgent', () => {
+  it('enables agent requests on first use and keeps unreadable settings off', () => {
+    expect(readAgentAccess(dir)).toBe('full')
+    writeFileSync(join(dir, 'agent-access.json'), '{')
+    expect(readAgentAccess(dir)).toBe('off')
+  })
+
   it('opens nothing while off, and removes an address file left by a crash', () => {
     writeFileSync(join(dir, 'agent-api.json'), '{}')
     start('off')
@@ -403,7 +409,7 @@ describe('startAgent', () => {
     expect(ask).toHaveBeenCalledOnce()
   })
 
-  it('takes a failed prompt as Not now, and asks the next agent', async () => {
+  it('takes a failed prompt as no answer, and asks the next agent', async () => {
     let fail!: (e: Error) => void
     ask.mockImplementationOnce(() => new Promise((_, reject) => (fail = reject)))
     start('full')
@@ -478,25 +484,18 @@ describe('startAgent', () => {
     expect(agent.agents().map((a) => a.name)).toEqual(['allowed'])
   })
 
-  it('asks a Waiting agent that calls again, at most once per 10 minutes', async () => {
+  it('asks a Waiting agent again at once when it calls after its prompt closed, but not while it is asked', async () => {
     const answers = heldAsk()
     start('full')
     const { token } = await register('a')
-    // Not now.
-    answers[0](null)
-    await tick()
     const listEvents = (): ReturnType<typeof call> => call('/v1/listEvents', { token, body: {} })
+    // While it is asked: no new prompt.
     expect((await listEvents()).status).toBe(403)
     expect(ask).toHaveBeenCalledOnce()
-    const now = Date.now()
-    vi.spyOn(Date, 'now').mockReturnValue(now + 10 * 60_000)
-    expect((await listEvents()).status).toBe(403)
-    expect(ask).toHaveBeenCalledTimes(2)
-    // While it is asked, and right after: no new prompt.
-    await listEvents()
-    answers[1](null)
+    // Closed without an answer, for example agent access turned off and on again.
+    answers[0](null)
     await tick()
-    await listEvents()
+    expect((await listEvents()).status).toBe(403)
     expect(ask).toHaveBeenCalledTimes(2)
   })
 
@@ -692,7 +691,7 @@ describe('busy-peasy.mjs', () => {
     process.env.APPDATA = appData
     process.env.BUSY_PEASY_DEV = '1'
     process.env.BUSY_PEASY_AGENT = 'test agent'
-    // A waiting agent's call ends at once, not after 25 s.
+    // Most tests inspect the waiting response directly.
     process.env.BUSY_PEASY_WAIT_MS = '0'
     client = await import(pathToFileURL(join(process.cwd(), 'resources/busy-peasy.mjs')).href)
   })
@@ -724,6 +723,33 @@ describe('busy-peasy.mjs', () => {
   }
   const tokenPath = (): string => join(dir, 'agent-tokens', readdirSync(join(dir, 'agent-tokens'))[0])
   const listEvents = (): Promise<unknown> => client.call('listEvents', { start: 0, end: 1 })
+
+  it.each(['full', 'read'] as const)('asks in the app when a reader moves an event and accepts the %s answer', async (answer) => {
+    const answers = heldAsk()
+    await startApp()
+    await expect(listEvents()).rejects.toThrow('waiting')
+    answers[0]('read')
+    await expect(listEvents()).resolves.toEqual([])
+    delete process.env.BUSY_PEASY_WAIT_MS
+    const now = Date.now()
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(now)
+    const move = client.call('updateEvent', { eventId: 1, patch: { start: 100, end: 200 } })
+    const result = move.then(() => 'moved', (error: Error) => error.message)
+    await vi.waitFor(() => expect(answers).toHaveLength(2))
+    clock.mockReturnValue(now + 60_000)
+    // Let the client poll past its old deadline before answering.
+    await new Promise((resolve) => setTimeout(resolve, 2200))
+    expect(api.updateEvent).not.toHaveBeenCalled()
+    answers[1](answer)
+    if (answer === 'full') {
+      expect(await result).toBe('moved')
+      expect(api.updateEvent).toHaveBeenCalledOnce()
+    } else {
+      expect(await result).toContain('Read only')
+      expect(api.updateEvent).not.toHaveBeenCalled()
+    }
+    expect(ask).toHaveBeenCalledTimes(2)
+  })
 
   it('registers, waits for the user, works once allowed, and registers again after Remove', async () => {
     await startApp()
@@ -930,6 +956,26 @@ describe('busy-peasy.mjs', () => {
   // Real CLI and MCP processes, as agents start them. No BUSY_PEASY_AGENT: the name must come from them.
   const cliPath = join(process.cwd(), 'resources/busy-peasy.mjs')
   const childEnv = (): NodeJS.ProcessEnv => ({ ...process.env, BUSY_PEASY_AGENT: '' })
+
+  it('drops a cancelled MCP edit while the popup waits for an answer', async () => {
+    const answers = heldAsk()
+    await startApp()
+    const child = spawn(process.execPath, [cliPath, 'mcp', '--dev'], { env: { ...childEnv(), BUSY_PEASY_WAIT_MS: '10000' } })
+    const lines = createInterface({ input: child.stdout })[Symbol.asyncIterator]()
+    const send = (message: object): boolean => child.stdin.write(JSON.stringify({ jsonrpc: '2.0', ...message }) + '\n')
+    try {
+      send({ id: 1, method: 'tools/call', params: { name: 'updateEvent', arguments: { eventId: 1, patch: { start: 100, end: 200 } } } })
+      await vi.waitFor(() => expect(answers).toHaveLength(1))
+      send({ method: 'notifications/cancelled', params: { requestId: 1 } })
+      send({ id: 2, method: 'ping' })
+      expect(JSON.parse(String((await lines.next()).value)).id).toBe(2)
+      answers[0]('full')
+      await new Promise((resolve) => setTimeout(resolve, 2200))
+      expect(api.updateEvent).not.toHaveBeenCalled()
+    } finally {
+      child.kill()
+    }
+  })
 
   it('takes the name from --agent=', async () => {
     await startApp()

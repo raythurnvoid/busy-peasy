@@ -1,6 +1,6 @@
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron'
 import type { Api, CalendarEvent, DataChanged } from '../shared/api'
-import type { ApprovalAnswer, ApprovalRequest } from '../shared/approval'
+import type { AgentAccess, ApprovalRequest } from '../shared/approval'
 
 // Every Api method goes through the single 'api' channel. Main checks the name and the caller.
 const names: (keyof Api)[] = [
@@ -79,7 +79,7 @@ contextBridge.exposeInMainWorld('api', {
     ipcRenderer.send('agent-approval-ready')
     return () => ipcRenderer.off('agent-approval', listener)
   },
-  answerAgentApproval(id: string, answer: ApprovalAnswer): void {
+  answerAgentApproval(id: string, answer: AgentAccess): void {
     ipcRenderer.send('agent-approval-answer', id, answer)
   }
 })

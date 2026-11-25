@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Busy Peasy agent client: a CLI, an MCP server and a small JS module for the agent API of the running app
-// (src/main/agent.ts). Turn the API on in the tray menu: Agent access > Read only or Full access.
+// (src/main/agent.ts). The app asks the user for access when needed.
 //
 //   node busy-peasy.mjs help                       the methods and their params
 //   node busy-peasy.mjs <method> ['<json params>']  one call, e.g. listEvents '{"start":"2026-11-09T00:00","end":"2026-11-16T00:00"}'
@@ -9,7 +9,7 @@
 //
 // --dev (or BUSY_PEASY_DEV=1) talks to a dev run (pnpm dev) instead of the installed app.
 // --agent=<name> (or BUSY_PEASY_AGENT) is the agent's name; MCP takes the client's name. Each agent gets its own token,
-// kept in agent-tokens\. A call waits up to 25 s for the user to allow the agent in Busy Peasy.
+// kept in agent-tokens\. A call waits for the user's answer in Busy Peasy.
 
 // Plain JavaScript, so any Node can run it without a build: it has no return types.
 /* eslint-disable @typescript-eslint/explicit-function-return-type */
@@ -19,6 +19,7 @@ import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } 
 import { homedir, tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createInterface } from 'node:readline'
+import { setTimeout as sleep } from 'node:timers/promises'
 import { pathToFileURL } from 'node:url'
 
 const dev = process.argv.includes('--dev') || process.env.BUSY_PEASY_DEV === '1'
@@ -39,10 +40,8 @@ const START_WAIT_MS = 20_000
 const EXIT_WAIT_MS = 2000
 // An empty token file younger than this: another process registers the same name right now.
 const CLAIM_MS = 60_000
-// While the agent waits for the user, a call tries again this often, for up to BUSY_PEASY_WAIT_MS (tests) or 25 s.
+// While the user decides, check for an answer this often.
 const RETRY_MS = 2000
-
-const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 
 // MCP sets it from the client's name.
 let defaultName = 'Busy Peasy CLI'
@@ -52,8 +51,7 @@ const agentName = () =>
 
 // The same text as the app's (src/main/agent.ts).
 const waiting = (name) =>
-  `Busy Peasy is waiting for the user to allow "${name}". Ask the user to answer the Busy Peasy prompt, or, if none is ` +
-  `showing, to pick a level in the tray menu: Agent access > ${name}. Then try again.`
+  `Busy Peasy is waiting for the user to allow "${name}". Answer the prompt in the Busy Peasy window, then try again.`
 
 // null also for a file left by a crash: its app is gone, and another program may listen on its port now.
 function readApiFile() {
@@ -67,10 +65,11 @@ function readApiFile() {
 }
 
 // The error keeps the HTTP status: 401 means register again.
-async function request(file, method, params, token) {
+async function request(file, method, params, token, askForAccess = false, signal) {
   const response = await fetch(`${file.url}/v1/${method}`, {
     method: method === 'help' ? 'GET' : 'POST',
-    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    signal,
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', 'X-Busy-Peasy-Ask': String(askForAccess) },
     body: method === 'help' ? undefined : JSON.stringify(params ?? {})
   }).catch((e) => {
     // The app may be gone, and another program may take its port: the next call proves it again.
@@ -196,44 +195,46 @@ async function agentToken(file) {
 }
 
 // help needs no agent: an MCP server lists its tools without a prompt. Other methods use the agent's token.
-async function requestAsAgent(file, method, params) {
+async function requestAsAgent(file, method, params, askForAccess, signal) {
   await proveApp(file)
   if (method === 'help') return request(file, method, params, file.token)
   const token = await agentToken(file)
   try {
-    return await request(file, method, params, token)
+    return await request(file, method, params, token, askForAccess, signal)
   } catch (e) {
     if (e.status !== 401) throw e
     // The user removed the agent, or the app lost its list: register again, once. Remove the file only if it still
     // holds the token that failed: a call running at the same time may have put a new one there.
     const path = tokenFile(agentName())
     if (readTokenFile(path)?.token === token) rmSync(path, { force: true })
-    return request(file, method, params, await agentToken(file))
+    return request(file, method, params, await agentToken(file), askForAccess, signal)
   }
 }
 
 let started = false
 
-// Calls one method. While the user has not allowed the agent yet, tries again until the wait time ends, then gives the
-// waiting text.
-export async function call(method, params) {
-  const end = Date.now() + Number(process.env.BUSY_PEASY_WAIT_MS ?? 25_000)
+// Wait for an explicit answer. Tests can set a shorter wait.
+export async function call(method, params, signal) {
+  const end = Date.now() + Number(process.env.BUSY_PEASY_WAIT_MS ?? Infinity)
+  let askForAccess = true
   for (;;) {
     try {
-      return await callOnce(method, params)
+      return await callOnce(method, params, askForAccess, signal)
     } catch (e) {
       if (!e.message.startsWith('Busy Peasy is waiting for the user') || Date.now() + RETRY_MS > end) throw e
-      await sleep(RETRY_MS)
+      // Poll the same request without asking again if the user chose Read only.
+      askForAccess = false
+      await sleep(RETRY_MS, undefined, { signal })
     }
   }
 }
 
 // If the app is not running, starts the installed app in the tray once and waits for it.
-async function callOnce(method, params) {
+async function callOnce(method, params, askForAccess, signal) {
   const file = readApiFile()
   try {
     if (!file) throw new Error('No agent-api.json')
-    return await requestAsAgent(file, method, params)
+    return await requestAsAgent(file, method, params, askForAccess, signal)
   } catch (e) {
     // Only a missing app is retried: an answer from the app (a wrong argument) is the result.
     if (file && !(e instanceof TypeError)) throw e
@@ -243,9 +244,9 @@ async function callOnce(method, params) {
     child.unref()
     let end = Date.now() + START_WAIT_MS
     child.on('exit', () => (end = Math.min(end, Date.now() + EXIT_WAIT_MS)))
-    for (; Date.now() < end; await sleep(500)) {
+    for (; Date.now() < end; await sleep(500, undefined, { signal })) {
       const next = readApiFile()
-      if (next && next.pid !== file?.pid) return requestAsAgent(next, method, params)
+      if (next && next.pid !== file?.pid) return requestAsAgent(next, method, params, askForAccess, signal)
     }
     throw notRunning()
   }
@@ -253,8 +254,7 @@ async function callOnce(method, params) {
 
 const notRunning = () =>
   new Error(
-    `Busy Peasy${dev ? ' (dev)' : ''} is not running, or its agent access is off. Start it and pick Agent access > ` +
-      'Read only or Full access in its tray menu.'
+    `Busy Peasy${dev ? ' (dev)' : ''} is not running, or its agent access is off. Check that the app is running.`
   )
 
 // MCP over stdio: one JSON-RPC message per line. Tools come from the app's method list.
@@ -283,17 +283,22 @@ async function mcp() {
       }
     }))
   }
-  const run = async ({ name, arguments: args }) => {
+  const pending = new Map()
+  const run = async (id, { name, arguments: args }) => {
+    const controller = new AbortController()
+    pending.set(id, controller)
     try {
-      const result = await call(name, args)
+      const result = await call(name, args, controller.signal)
       if (name === 'screenshot') return { content: [{ type: 'image', data: result.data, mimeType: result.mimeType }] }
       return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] }
     } catch (e) {
+      if (controller.signal.aborted) return
       return { content: [{ type: 'text', text: e.message }], isError: true }
+    } finally {
+      pending.delete(id)
     }
   }
-  // Not awaited in the loop: a slow call (up to 25 s while the user is asked to allow the agent) must not hold up ping
-  // or others.
+  // Keep taking pings and cancellations while the user decides.
   const answer = async ({ id, method, params }) => {
     try {
       if (method === 'initialize') {
@@ -313,7 +318,10 @@ async function mcp() {
         })
       } else if (method === 'ping') out({ id, result: {} })
       else if (method === 'tools/list') out({ id, result: { tools: await tools() } })
-      else if (method === 'tools/call') out({ id, result: await run(params) })
+      else if (method === 'tools/call') {
+        const result = await run(id, params)
+        if (result) out({ id, result })
+      }
       else out({ id, error: { code: -32601, message: `Unknown method ${method}` } })
     } catch (e) {
       out({ id, error: { code: -32000, message: e.message } })
@@ -328,9 +336,11 @@ async function mcp() {
       out({ id: null, error: { code: -32700, message: 'Parse error' } })
       continue
     }
-    // Notifications (no id) need no answer.
-    if (message.id !== undefined) void answer(message)
+    if (message.method === 'notifications/cancelled') pending.get(message.params?.requestId)?.abort()
+    else if (message.id !== undefined) void answer(message)
   }
+  // A disconnected agent must not run a waiting edit later.
+  for (const controller of pending.values()) controller.abort()
 }
 
 async function cli() {

@@ -3,19 +3,20 @@
     APPROVAL_ARM_MS,
     approvalText,
     mayAnswer,
-    type ApprovalAnswer,
+    type AgentAccess,
     type ApprovalRequest
   } from '../../../shared/approval'
 
-  // Asks the user to allow a new agent (main/ipc.ts askApproval). Agents must not answer it: main refuses their page
-  // input while it is open (main/agent.ts), the buttons take only the user's own click or key (a key once the window
-  // has had the focus for APPROVAL_ARM_MS, see mayAnswer), and main checks the answer again (main/ipc.ts).
-  let { request, onanswer }: { request: ApprovalRequest; onanswer: (answer: ApprovalAnswer) => void } = $props()
+  // Asks the user to allow a new agent (main/ipc.ts askApproval). It stays open until the user picks a level: no Not
+  // now, and Esc does nothing. Agents must not answer it: main refuses their page input while it is open
+  // (main/agent.ts), the buttons take only the user's own click or key (a key once the window has had the focus for
+  // APPROVAL_ARM_MS, see mayAnswer), and main checks the answer again (main/ipc.ts).
+  let { request, onanswer }: { request: ApprovalRequest; onanswer: (answer: AgentAccess) => void } = $props()
 
   const text = $derived(approvalText(request))
 
   let dialog: HTMLDialogElement | undefined = $state()
-  let notNow: HTMLButtonElement | undefined = $state()
+  let deny: HTMLButtonElement | undefined = $state()
   // When the window got the focus. null: it has none, so no key answers (a mouse click still does).
   let armedSince: number | null = null
   // Only for the look and for snapshot: the buttons are aria-disabled until then.
@@ -34,8 +35,8 @@
 
   $effect(() => {
     dialog?.showModal()
-    // Not now first: Enter or Space from someone typing elsewhere gives nothing.
-    notNow?.focus()
+    // Deny first: Enter or Space from someone typing elsewhere gives the agent nothing.
+    deny?.focus()
     rearm()
     const focus = (): void => rearm(true)
     const blur = (): void => rearm(false)
@@ -52,7 +53,7 @@
   })
 
   // App.svelte closes the prompt; main checks the answer again.
-  function answer(e: Event, value: ApprovalAnswer): void {
+  function answer(e: Event, value: AgentAccess): void {
     if (mayAnswer(e, armedSince, Date.now())) onanswer(value)
   }
 </script>
@@ -67,21 +68,20 @@
   aria-describedby="agent-approval-text"
   onkeydown={(e) => {
     e.stopPropagation()
-    // A key from a script, or any key but the ones that answer (Tab too): the arm starts again. Someone typing
+    // A key from a script, or any key but the ones that answer (Tab and Esc too): the arm starts again. Someone typing
     // elsewhere, then Tab and Space, gives nothing; the user pauses 1 s first.
-    if (!e.isTrusted || !['Enter', ' ', 'Escape'].includes(e.key)) rearm()
+    if (!e.isTrusted || !['Enter', ' '].includes(e.key)) rearm()
   }}
   onclose={() => {
     // Chromium can close a modal dialog on Esc without a cancel it lets us stop. Main still waits: show it again.
     if (closing) return
     dialog?.showModal()
-    notNow?.focus()
+    deny?.focus()
     rearm()
   }}
   oncancel={(e) => {
-    // Esc is Not now. Never the default close: the prompt closes only with an answer main takes.
+    // Esc does nothing: the prompt closes only with an answer main takes.
     e.preventDefault()
-    answer(e, null)
   }}
 >
   <h2 id="agent-approval-title">{text.title}</h2>
@@ -91,13 +91,12 @@
     {/each}
   </div>
   <div class="buttons">
-    <button type="button" class="pill-btn" aria-disabled={!armed} onclick={(e) => answer(e, 'off')}>Deny</button>
-    <button bind:this={notNow} type="button" class="filled-btn" aria-disabled={!armed} onclick={(e) => answer(e, null)}
-      >Not now</button
+    <button bind:this={deny} type="button" class="filled-btn" aria-disabled={!armed} onclick={(e) => answer(e, request.upgrade ? 'read' : 'off')}
+      >{request.upgrade ? 'Keep read only' : 'Deny'}</button
     >
-    <button type="button" class="pill-btn" aria-disabled={!armed} onclick={(e) => answer(e, 'read')}
-      >Allow read only</button
-    >
+    {#if !request.upgrade}
+      <button type="button" class="pill-btn" aria-disabled={!armed} onclick={(e) => answer(e, 'read')}>Allow read only</button>
+    {/if}
     <button type="button" class="pill-btn" aria-disabled={!armed} onclick={(e) => answer(e, 'full')}
       >Allow full access</button
     >

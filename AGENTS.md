@@ -11,7 +11,7 @@
 - To check a change in the running dev app, use the agent API (README, "Agent access"): put `{"access":"full"}` in
   `%APPDATA%\busy-peasy-dev\agent-access.json` before the start, then `node resources/busy-peasy.mjs --dev snapshot`,
   `click`, `fill`, `press`, `screenshot`. The dev data folder has no real accounts unless someone signed in there.
-- Each agent has its own token. A `--dev` call from a new agent waits up to 25 s for the user to allow it. Name it with
+- Each agent has its own token. A `--dev` call from a new agent waits for the user's answer. Name it with
   `BUSY_PEASY_AGENT=<agent name>`. The agent's level is kept in `busy-peasy-dev`, so this happens once per name.
 - Do not ask the user to answer the prompt that allows an agent. The agent API cannot answer it, by design. To allow an
   agent in a dev run, open the debugging port only for that step: start the run with

@@ -39,19 +39,16 @@ const LOG_FILE = 'agent-log.jsonl'
 const MAX_BODY = 1_000_000
 const MAX_AGENTS = 20
 const MAX_PENDING = 3
-// A Waiting agent that calls again is asked again, but not more often than this.
-const ASK_AGAIN_MS = 10 * 60_000
 const ACCESS_ORDER: AgentAccess[] = ['off', 'read', 'full']
 // Methods that send input to the page or change what it shows. No agent may use them while the prompt is open: the
 // prompt is in the page.
 const PAGE_INPUT = new Set(['click', 'fill', 'press', 'navigate', 'openEvent', 'search', 'openSettings', 'addAccount', 'openNewEvent', 'editEvent'])
 const waiting = (name: string): string =>
-  `Busy Peasy is waiting for the user to allow "${name}". Ask the user to answer the Busy Peasy prompt, or, if none is ` +
-  `showing, to pick a level in the tray menu: Agent access > ${name}. Then try again.`
+  `Busy Peasy is waiting for the user to allow "${name}". Answer the prompt in the Busy Peasy window, then try again.`
 const turnedOff = (name: string): string =>
   `The user turned off "${name}" in Busy Peasy. The user can change it in the tray menu: Agent access > ${name}.`
 const readOnly = (name: string): string =>
-  `Busy Peasy gives "${name}" Read only access. The user can change it in the tray menu: Agent access.`
+  `Busy Peasy gives "${name}" Read only access. The change was blocked.`
 const TOO_OLD =
   'This Busy Peasy client is too old: Busy Peasy now gives each agent its own token. Restart the agent or its MCP ' +
   'server, so it loads the new busy-peasy.mjs (path: "cli" in agent-api.json).'
@@ -113,8 +110,8 @@ export interface AgentOptions {
   // agents.bin: safeStorage in the app, plain text in tests.
   encrypt(text: string): Promise<Buffer>
   decrypt(data: Buffer): Promise<string>
-  // Asks the user to allow a new agent, in a prompt in the main window (index.ts, ipc.ts askApproval). null: Not now.
-  // signal: closes the prompt.
+  // Asks the user to allow a new agent, in a prompt in the main window (index.ts, ipc.ts askApproval). null: it
+  // closed without an answer. signal: closes the prompt.
   ask(request: ApprovalRequest, signal: AbortSignal): Promise<ApprovalAnswer>
   // The agent list or a level changed, or the list loaded: the tray rebuilds its menu.
   agentsChanged(): void
@@ -387,8 +384,8 @@ export function readAgentAccess(dir: string): AgentAccess {
   try {
     const { access } = JSON.parse(readFileSync(join(dir, ACCESS_FILE), 'utf8'))
     return access === 'read' || access === 'full' ? access : 'off'
-  } catch {
-    return 'off'
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code === 'ENOENT' ? 'full' : 'off'
   }
 }
 
@@ -447,10 +444,8 @@ export function startAgent(o: AgentOptions): {
   let agents: SavedAgent[] = []
   let saving = Promise.resolve()
   // One prompt at a time. While one is open (asking is set), no agent may send input to the page (PAGE_INPUT).
-  const toAsk: { id: string; twin: boolean }[] = []
+  const toAsk: { id: string; level: 'pending' | 'read' }[] = []
   let asking: { id: string; abort: AbortController } | null = null
-  // When each agent was last put in toAsk.
-  const askedAt = new Map<string, number>()
 
   const help = (): unknown => ({
     about:
@@ -539,6 +534,8 @@ export function startAgent(o: AgentOptions): {
   // The list in memory has changed already, and that protects at once; the file follows. A prompt still open for this
   // agent closes.
   const changed = (id: string): void => {
+    const queued = toAsk.findIndex((a) => a.id === id)
+    if (queued >= 0) toAsk.splice(queued, 1)
     void save()
     o.agentsChanged()
     if (asking?.id === id) asking.abort.abort()
@@ -561,26 +558,28 @@ export function startAgent(o: AgentOptions): {
     const next = toAsk.shift()
     if (!next) return
     const agent = agents.find((a) => a.id === next.id)
-    if (agent?.level !== 'pending') return askNext()
+    if (!agent || agent.level !== next.level || (next.level === 'read' && access !== 'full')) return askNext()
     asking = { id: agent.id, abort: new AbortController() }
+    const signal = asking.abort.signal
     void o
-      .ask({ id: agent.id, name: agent.name, twin: next.twin, trayAccess: access }, asking.abort.signal)
+      .ask({
+        id: agent.id, name: agent.name, twin: isTwin(agent.name, agent), trayAccess: access,
+        ...(next.level === 'read' && { upgrade: true })
+      }, signal)
       .catch(() => null)
       .then((answer) => {
         // First, so setAgentLevel does not close this prompt: it is answered already.
         asking = null
         // The user may have answered in the tray, or removed the agent, while the prompt was open.
-        if (answer && agents.includes(agent) && agent.level === 'pending') setAgentLevel(agent.id, answer)
+        if (answer && !signal.aborted && agents.includes(agent) && agent.level === next.level) setAgentLevel(agent.id, answer)
         askNext()
       })
   }
 
-  // A Waiting agent that calls again is asked again, for example after Not now, but at most once per ASK_AGAIN_MS.
+  const isWaiting = (id: string): boolean => asking?.id === id || toAsk.some((a) => a.id === id)
   const askAgain = (agent: SavedAgent): void => {
-    if (asking?.id === agent.id || toAsk.some((a) => a.id === agent.id)) return
-    if (Date.now() - (askedAt.get(agent.id) ?? 0) < ASK_AGAIN_MS) return
-    askedAt.set(agent.id, Date.now())
-    toAsk.push({ id: agent.id, twin: isTwin(agent.name, agent) })
+    if (isWaiting(agent.id) || (agent.level !== 'pending' && agent.level !== 'read')) return
+    toAsk.push({ id: agent.id, level: agent.level })
     askNext()
   }
 
@@ -635,9 +634,7 @@ export function startAgent(o: AgentOptions): {
       return send(response, 500, { error: 'Could not save the agent.' })
     }
     o.agentsChanged()
-    askedAt.set(agent.id, Date.now())
-    toAsk.push({ id: agent.id, twin })
-    askNext()
+    askAgain(agent)
     send(response, 200, { result: { token: agentToken, name } })
   }
 
@@ -671,6 +668,10 @@ export function startAgent(o: AgentOptions): {
         if (agent.level === 'pending') {
           askAgain(agent)
           return { status: 403, error: waiting(agent.name) }
+        }
+        if (agent.level === 'read' && access === 'full') {
+          if (request.headers['x-busy-peasy-ask'] === 'true') askAgain(agent)
+          if (isWaiting(agent.id)) return { status: 403, error: waiting(agent.name) }
         }
         return { status: 403, error: agent.level === 'off' ? turnedOff(agent.name) : readOnly(agent.name) }
       }

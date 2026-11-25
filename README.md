@@ -36,7 +36,8 @@ $ pnpm build:linux
 ### Agent access
 
 Agents (Claude Code, Codex, scripts) can read and change the calendar and use the app window. Everything stays on this
-PC. An agent with Full access can also start adding an account (`addAccount`); you still sign in yourself. Turn it on in the tray menu: **Agent access** > **Read only** or **Full access**. It is **Off** by default.
+PC. An agent with Full access can also start adding an account (`addAccount`); you still sign in yourself. On first
+use, the app accepts agent requests and asks you for permission in its window. It remembers your choice.
 
 - **Read only**: read accounts, calendars, events and settings; see the screen (`getState`, `snapshot`, `screenshot`);
   move around (`navigate`, `openEvent`, `search`).
@@ -48,13 +49,14 @@ The app listens on `127.0.0.1` only, on a new port with a new register token at 
 your Windows account can read that file. The register token can only register a new agent and read `help`.
 
 Each agent gets its own token. The first time an agent calls a method, the Busy Peasy window asks you whether to allow
-it: **Deny**, **Not now**, **Allow read only** or **Allow full access**. The window comes up without taking the focus
-and flashes in the taskbar, so keys you type elsewhere stay there. A mouse click on a button answers once the prompt
-has been up for 1 second. Keys answer once the window has had the focus for 1 second, and any other key (Tab too)
-starts that second again. With no answer in 2 minutes, the prompt closes as **Not now**. Until you allow the agent, its
-calls wait up to 25 seconds, then fail with a "waiting" message. After **Not now** it asks again when the agent calls,
-at most once every 10 minutes. While the prompt is open, no agent can use `click`, `fill`, `press` or the commands that
-change the window, and agents cannot answer it.
+it: **Deny**, **Allow read only** or **Allow full access**. The window comes up without taking the focus and flashes
+in the taskbar, so keys you type elsewhere stay there. A mouse click on a button answers once the prompt has been up
+for 1 second. Keys answer once the window has had the focus for 1 second, and any other key (Tab too) starts that
+second again. The prompt stays open until you pick one: it has no time limit, Esc does nothing, and hiding the window
+leaves it open. A CLI or MCP call waits for your answer. Approving lets the waiting call continue. Rejecting blocks it. While
+the prompt is open, no agent can use `click`, `fill`, `press` or the commands that change the window, and agents
+cannot answer it. When a Read only agent tries to edit through the CLI or MCP, the app asks for Full access in
+the same window. Choose **Allow full access** to continue the edit or **Keep read only** to decline.
 
 The tray menu **Agent access** lists every agent: pick a level for it there, or **Remove** it. The tray access (Off,
 Read only, Full access) is the upper limit for all agents. The app keeps the agent list encrypted in `agents.bin` (only
@@ -97,7 +99,8 @@ From a script: `import { call } from './busy-peasy.mjs'`, then `await call('list
 also works: first `POST <url>/v1/register` with `Authorization: Bearer <token from agent-api.json>` and
 `{"name":"My script"}`. It returns the agent's own token. After you allow the agent, `POST <url>/v1/<method>` with
 `Authorization: Bearer <agent token>` and a JSON object of params. `GET /v1/help` lists the methods; it works with
-either token.
+either token. To ask for Full access on a write, send `X-Busy-Peasy-Ask: true` on the first request.
+If the app is waiting for your answer, retry without that header.
 
 While agent access is on, the app also shows its page to Windows UI Automation tools (Chromium does that only for known
 screen readers otherwise).
