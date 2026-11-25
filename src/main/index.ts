@@ -23,7 +23,7 @@ import { startReminders } from './reminders'
 import { appUrl, handleAppProtocol, hardenApp, registerAppScheme } from './security'
 import { createSyncScheduler, type SyncScheduler } from './sync/scheduler'
 import { createTray, enableStartAtLoginOnce, HIDDEN_ARG } from './tray'
-import { downloadedUpdate, installUpdate, startUpdates } from './updater'
+import { checkForUpdates, downloadedUpdate, installUpdate, startUpdates } from './updater'
 
 const APP_ID = 'bonobo-senate.busypeasy'
 const POLL_INTERVAL = 2 * 60_000
@@ -260,6 +260,7 @@ if (!app.requestSingleInstanceLock()) {
     })
     const api = createApi(db, scheduler, reminders, showSignedOut, showEvent, {
       version: downloadedUpdate,
+      check: checkForUpdates,
       install: restartAndUpdate
     })
     registerApi(api, devUrl)

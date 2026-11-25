@@ -38,7 +38,7 @@
   }
 </script>
 
-<aside class="side">
+<div class="side">
   <!-- The view's one primary button, in the Palazzo deep orange. -->
   <button class="filled-btn create" title="Create event (c)" onclick={oncreate}>
     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6z" /></svg>
@@ -97,7 +97,7 @@
   {/if}
   <button class="pill-btn add" disabled={signIn.busy} onclick={() => run(window.api.addGoogleAccount)}>Add Google account</button>
   {#if signIn.error}<p class="error" role="alert">{signIn.error}</p>{/if}
-</aside>
+</div>
 
 <style>
   .side {

@@ -253,6 +253,10 @@ export interface Settings {
   secondaryTimeZoneLabel: string
 }
 
+export type UpdateCheck =
+  | { status: 'current' | 'dev' | 'error'; currentVersion: string }
+  | { status: 'ready'; currentVersion: string; updateVersion: string }
+
 export interface Api {
   listAccounts(): Promise<Account[]>
   listCalendars(): Promise<Calendar[]>
@@ -295,6 +299,7 @@ export interface Api {
   saveSettings(settings: Settings): Promise<void>
   // The version of a downloaded update that installs on the next quit. null: none.
   getUpdate(): Promise<string | null>
+  checkForUpdates(): Promise<UpdateCheck>
   // Quits, installs the downloaded update and starts the app again.
   installUpdate(): Promise<void>
 }

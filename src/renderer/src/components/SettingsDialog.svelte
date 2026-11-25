@@ -1,5 +1,6 @@
 <script lang="ts">
-  import type { Settings } from '../../../shared/api'
+  import { onMount } from 'svelte'
+  import type { Settings, UpdateCheck } from '../../../shared/api'
   import { EVENT_MINUTES, MAX_ZONE_LABEL, WEEK_STARTS } from '../../../shared/settings'
   import { formats } from '../lib/settings.svelte'
   import { errorMessage } from '../lib/sign-in.svelte'
@@ -7,8 +8,12 @@
   import ReminderList from './ReminderList.svelte'
   import ZonePicker from './ZonePicker.svelte'
 
-  let { initial, onsave, onclose }: { initial: Settings; onsave: (settings: Settings) => Promise<void>; onclose: () => void } =
-    $props()
+  let { initial, readyVersion, onsave, onclose }: {
+    initial: Settings
+    readyVersion: string | null
+    onsave: (settings: Settings) => Promise<void>
+    onclose: () => void
+  } = $props()
 
   const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
   const THEMES = [
@@ -21,6 +26,10 @@
   let form = $state($state.snapshot(initial))
   let saving = $state(false)
   let error = $state('')
+  let update = $state<UpdateCheck>()
+  let checking = $state(true)
+  let restarting = $state(false)
+  let installError = $state('')
   let dialog: HTMLDialogElement | undefined = $state()
   const now = Date.now()
   // Like Google's checkbox: off saves no secondary zone, and the picked zone and label stay here.
@@ -30,6 +39,32 @@
   let secondary = $state(initial.secondaryTimeZone ?? pcZone())
   const next = $derived({ ...form, secondaryTimeZone: showZones ? secondary : null })
   const dirty = $derived(JSON.stringify(next) !== JSON.stringify(initial))
+  const installVersion = $derived(readyVersion ?? (update?.status === 'ready' ? update.updateVersion : null))
+
+  onMount(() => void checkUpdates())
+
+  async function checkUpdates(): Promise<void> {
+    checking = true
+    try {
+      update = await window.api.checkForUpdates()
+    } catch {
+      update = undefined
+    } finally {
+      checking = false
+    }
+  }
+
+  async function restartToUpdate(): Promise<void> {
+    if (dirty && !confirm('Discard your changes and restart to update?')) return
+    restarting = true
+    installError = ''
+    try {
+      await window.api.installUpdate()
+    } catch (e) {
+      installError = errorMessage(e)
+      restarting = false
+    }
+  }
 
   async function save(): Promise<void> {
     if (saving) return
@@ -92,6 +127,34 @@
 
     <!-- Only this part scrolls, so Save and Cancel stay in view. -->
     <div class="body">
+      <fieldset>
+        <legend>Updates</legend>
+        <div class="update-row">
+          <p class="note" role="status">
+            {#if installError}
+              {installError}
+            {:else if installVersion}
+              Busy Peasy {installVersion} is ready to install.
+            {:else if checking}
+              Checking for updates…
+            {:else if update?.status === 'current'}
+              Busy Peasy {update.currentVersion} is up to date.
+            {:else if update?.status === 'dev'}
+              Development version {update.currentVersion}. Updates are available in the installed app.
+            {:else}
+              Could not check for updates. Try again.
+            {/if}
+          </p>
+          {#if installVersion}
+            <button type="button" class="filled-btn" disabled={restarting || saving} onclick={restartToUpdate}>
+              {restarting ? 'Restarting…' : 'Restart to update'}
+            </button>
+          {:else if update?.status !== 'dev'}
+            <button type="button" class="pill-btn" disabled={checking} onclick={checkUpdates}>Check for updates</button>
+          {/if}
+        </div>
+      </fieldset>
+
       <fieldset>
         <legend>Language and region</legend>
         <label class="field">
@@ -255,6 +318,14 @@
   .note {
     margin: 0;
     color: var(--on-surface-variant);
+  }
+
+  .update-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.5rem;
   }
 
   .field {

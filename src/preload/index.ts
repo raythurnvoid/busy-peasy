@@ -29,6 +29,7 @@ const names: (keyof Api)[] = [
   'getSettings',
   'saveSettings',
   'getUpdate',
+  'checkForUpdates',
   'installUpdate'
 ]
 

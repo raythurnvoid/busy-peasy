@@ -170,7 +170,7 @@ export function createApi(
   reminders: ReminderScheduler,
   onAccountRemoved: () => void,
   showEvent: (event: CalendarEvent | null) => void,
-  update: { version(): string | null; install(): void }
+  update: { version(): string | null; check: Api['checkForUpdates']; install(): void }
 ): Api {
   return {
     listAccounts: async () => listAccounts(db),
@@ -454,6 +454,7 @@ export function createApi(
       reminders.check()
     },
     getUpdate: async () => update.version(),
+    checkForUpdates: () => update.check(),
     installUpdate: async () => {
       // With nothing downloaded, the restart would only quit the app.
       check(update.version() !== null)

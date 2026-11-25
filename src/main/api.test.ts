@@ -32,7 +32,7 @@ let check: () => void
 let onAccountRemoved: () => void
 let showEvent: () => void
 let scheduler: ReminderScheduler
-let update: { version: () => string | null; install: () => void }
+let update: { version: () => string | null; check: Api['checkForUpdates']; install: () => void }
 
 beforeEach(() => {
   db = openDb(':memory:')
@@ -41,7 +41,7 @@ beforeEach(() => {
   onAccountRemoved = vi.fn()
   showEvent = vi.fn()
   scheduler = { check, list: vi.fn(), answer: vi.fn(), dismiss: vi.fn() }
-  update = { version: vi.fn(() => null), install: vi.fn() }
+  update = { version: vi.fn(() => null), check: vi.fn(), install: vi.fn() }
   api = createApi(db, { syncNow, syncAccount: vi.fn(async () => {}) }, scheduler, onAccountRemoved, showEvent, update)
   defaults = getSettings(db)
   nativeTheme.themeSource = 'system'

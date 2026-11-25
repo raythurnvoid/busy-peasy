@@ -1043,11 +1043,21 @@
         {/if}
       </form>
       <!-- Leaves search, like Go back and Esc. The X in the box only clears the text. -->
-      <button class="icon-btn close-search" aria-label="Close search" title="Close search (Esc)" onclick={closeSearch}>
+      <button class="icon-btn" aria-label="Close search" title="Close search (Esc)" onclick={closeSearch}>
         <svg viewBox="0 0 24 24"><path d="M19 6.4 17.6 5 12 10.6 6.4 5 5 6.4l5.6 5.6L5 17.6 6.4 19l5.6-5.6 5.6 5.6 1.4-1.4-5.6-5.6z" /></svg>
       </button>
     {:else}
-      <div class="brand">Busy Peasy</div>
+      <div class="brand logo">
+        <!-- The calendar mark used in the download site's full logo. -->
+        <svg viewBox="86 86 852 852" aria-hidden="true" fill="currentColor">
+          <path fill-rule="evenodd" d="M186 176H838A100 100 0 0 1 938 276V838A100 100 0 0 1 838 938H186A100 100 0 0 1 86 838V276A100 100 0 0 1 186 176ZM184 296H840A36 36 0 0 1 876 332V752A36 36 0 0 1 840 788H184A36 36 0 0 1 148 752V332A36 36 0 0 1 184 296Z"/>
+          <rect x="282" y="86" width="84" height="180" rx="42" />
+          <rect x="658" y="86" width="84" height="180" rx="42" />
+          <text x="512" y="661" text-anchor="middle" font-weight="700" font-size="340" letter-spacing="13.6">XII</text>
+          <text x="512" y="892.4" text-anchor="middle" font-weight="700" font-size="84" letter-spacing="10.08" fill="var(--stone-1)">B·P</text>
+        </svg>
+        Busy Peasy
+      </div>
       <button class="pill-btn" title="Today (t)" onclick={goToday}>Today</button>
       <button class="icon-btn" aria-label="Previous {view === 'schedule' ? 'day' : view}" title="Previous (k)" onclick={() => step(-1)}>
         <svg viewBox="0 0 24 24"><path d="M15.4 7.4 14 6l-6 6 6 6 1.4-1.4-4.6-4.6z" /></svg>
@@ -1074,19 +1084,24 @@
         </svg>
       </button>
     {/if}
-    <button bind:this={gear} class="icon-btn" aria-label="Settings" title="Settings" onclick={() => (settingsOpen = true)}>
-      <svg viewBox="0 0 24 24"><path d="M19.4 13a7.6 7.6 0 0 0 0-2l2.1-1.6-2-3.5-2.5 1a7.4 7.4 0 0 0-1.7-1L14.9 3h-4l-.4 2.9a7.4 7.4 0 0 0-1.7 1l-2.5-1-2 3.5L6.4 11a7.6 7.6 0 0 0 0 2l-2.1 1.6 2 3.5 2.5-1a7.4 7.4 0 0 0 1.7 1l.4 2.9h4l.4-2.9a7.4 7.4 0 0 0 1.7-1l2.5 1 2-3.5zM12.9 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7" /></svg>
-    </button>
   </header>
 
-  <Sidebar
-    {accounts}
-    {calendars}
-    {anchor}
-    weekStart={weekStartDay}
-    onpick={goTo}
-    oncreate={createFromKeyboard}
-  />
+  <aside class="sidebar">
+    <Sidebar
+      {accounts}
+      {calendars}
+      {anchor}
+      weekStart={weekStartDay}
+      onpick={goTo}
+      oncreate={createFromKeyboard}
+    />
+    <div class="sidebar-footer">
+      <button bind:this={gear} class="icon-btn settings-btn pz-label" title="Settings (s)" onclick={() => (settingsOpen = true)}>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.4 13a7.6 7.6 0 0 0 0-2l2.1-1.6-2-3.5-2.5 1a7.4 7.4 0 0 0-1.7-1L14.9 3h-4l-.4 2.9a7.4 7.4 0 0 0-1.7 1l-2.5-1-2 3.5L6.4 11a7.6 7.6 0 0 0 0 2l-2.1 1.6 2 3.5 2.5-1a7.4 7.4 0 0 0 1.7 1l.4 2.9h4l.4-2.9a7.4 7.4 0 0 0 1.7-1l2.5 1 2-3.5zM12.9 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7" /></svg>
+        Settings
+      </button>
+    </div>
+  </aside>
 
   <main class="card pz-panel">
     {#each signedOut as account (account.id)}
@@ -1305,7 +1320,7 @@
 {/if}
 
 {#if settingsOpen}
-  <SettingsDialog initial={settings} onsave={saveSettings} onclose={closeSettings} />
+  <SettingsDialog initial={settings} readyVersion={appUpdate} onsave={saveSettings} onclose={closeSettings} />
 {/if}
 
 {#if helpOpen}
@@ -1402,15 +1417,7 @@
     -webkit-app-region: no-drag;
   }
 
-  /* A narrow window has no room for everything: the name goes, so the bar's buttons are not cut. The period title is
-     gone by then too. */
-  @media (max-width: 51rem) {
-    .brand {
-      display: none;
-    }
-  }
-
-  /* Wide enough that Today starts above the card. In a narrow window it shrinks and wraps first. */
+  /* Wide enough that Today starts above the card. */
   .brand {
     width: 16.75rem;
     line-height: 1.2;
@@ -1425,6 +1432,20 @@
 
   .top .pill-btn {
     margin-right: 0.5rem;
+  }
+
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    min-width: max-content;
+    color: light-dark(#7a4f27, var(--ink));
+    white-space: nowrap;
+  }
+
+  .logo svg {
+    width: 2.125rem;
+    height: 2.125rem;
   }
 
   /* After the back button, so the box still starts above the card, like Google. */
@@ -1470,11 +1491,6 @@
   /* The box has no outline of its own, so the pill shows focus. */
   .search:focus-within {
     outline: 2px solid var(--accent);
-  }
-
-  /* Next to the box; the free space goes after it, so Settings stays at the end. */
-  .close-search {
-    margin-right: auto;
   }
 
   /* Cuts the title and its rules in a narrow window, so they never run over the view buttons. */
@@ -1529,6 +1545,75 @@
     background: var(--accent-wash);
     color: var(--accent-ink);
     box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--accent) 45%, var(--accent-wash));
+  }
+
+  /* Leave room for the full logo and the native window buttons at the minimum width. */
+  @media (max-width: 58rem) {
+    .logo {
+      width: auto;
+      gap: 0.375rem;
+      font-size: 0.875rem;
+    }
+
+    .logo svg {
+      width: 1.5rem;
+      height: 1.5rem;
+    }
+
+    .view-btn {
+      padding-inline: 0.5rem;
+    }
+  }
+
+  @media (max-width: 51rem) {
+    .top {
+      gap: 0.125rem;
+    }
+
+    .top .pill-btn {
+      margin-right: 0;
+      padding-inline: 0.625rem;
+    }
+
+    .views {
+      margin-right: 0;
+    }
+
+    .view-btn {
+      padding-inline: 0.375rem;
+    }
+
+    .search-title {
+      display: none;
+    }
+  }
+
+  /* At the smallest Windows size only a piece of the title rule would fit. Keep the live heading for screen readers. */
+  @media (max-width: 47rem) {
+    .title {
+      clip-path: inset(50%);
+    }
+  }
+
+  .sidebar {
+    display: grid;
+    grid-template-rows: minmax(0, 1fr) auto;
+    min-width: 0;
+  }
+
+  .sidebar-footer {
+    margin: 0 1rem 1rem;
+    padding-top: 0.5rem;
+    border-top: 1px solid var(--line);
+  }
+
+  .settings-btn {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 0.625rem;
+    width: 100%;
+    padding-inline: 0.5rem;
   }
 
   .card {
