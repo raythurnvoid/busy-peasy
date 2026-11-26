@@ -249,8 +249,6 @@ header {
 .hero {
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: clamp(20px, 3vw, 64px);
   padding: 48px clamp(16px, 6vw, 96px);
 }
 
@@ -259,25 +257,59 @@ header {
 
 .snap-end { display: none; }
 
-.media-box {
-  order: 1;
-  flex: 1 1 55%;
-  min-width: 0;
-  max-width: 1160px;
+/* The video sits on the right and fades into the page on its edges. */
+.video-box {
+  position: absolute;
+  top: 50%;
+  right: 0;
+  width: min(66vw, 1240px);
+  aspect-ratio: 16 / 9;
+  transform: translateY(-50%);
 }
 
-.hero .media {
+.hero video {
   display: block;
   width: 100%;
-  height: auto;
-  aspect-ratio: 16 / 9;
-  background: #000;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
+  mask-image:
+    linear-gradient(to right, transparent, #000 28%),
+    linear-gradient(to bottom, transparent, #000 14%, #000 86%, transparent);
+  mask-composite: intersect;
 }
+
+/* Replay and sound, on the video's bottom right corner, above its fade. The
+   video is dark in both themes, so the buttons are always light on dark. */
+.video-controls {
+  position: absolute;
+  right: 16px;
+  bottom: 16%;
+  display: flex;
+  gap: 8px;
+}
+
+.video-controls button {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 1px solid rgb(255 255 255 / 0.2);
+  border-radius: 50%;
+  background: rgb(20 14 8 / 0.6);
+  color: #f3ead8;
+  cursor: pointer;
+}
+
+.video-controls button:hover { background: rgb(20 14 8 / 0.85); }
+
+#video-sound[aria-pressed="false"] .sound-on,
+#video-sound[aria-pressed="true"] .sound-off { display: none; }
 
 .copy {
   position: relative;
-  flex: 1 1 35%;
-  max-width: 31rem;
+  max-width: min(31rem, 40vw);
 }
 
 .hero .logo {
@@ -447,7 +479,7 @@ footer {
 
 footer p { margin: 0; }
 
-/* ---- Phones: tabs on their own row, the app on top of the text ---- */
+/* ---- Phones: tabs on their own row, video on top of the text ---- */
 @media (max-width: 800px) {
   :root { --header-h: 132px; }
 
@@ -478,12 +510,12 @@ footer p { margin: 0; }
     letter-spacing: 0.08em;
   }
 
-  /* The hero is one screen plus --zoom-d of scroll. While it scrolls, the stage stays put: the app fades away, and
+  /* The hero is one screen plus --zoom-d of scroll. While it scrolls, the stage stays put: the video fades away, and
      the logo and line grow and move to the top. Only transforms change, so no line ever rewraps. The script sets
      --p (0 to 1), --s (scale of the titles), --copy-y and --titles-h. */
   .hero {
     --zoom-d: 50svh;
-    --media-h: min(65vw, 100svh - var(--header-h) - 200px);
+    --video-h: min(100vw, 100svh - var(--header-h) - 280px);
     display: block;
     height: calc(100svh - var(--header-h) + var(--zoom-d));
     padding: 0;
@@ -497,7 +529,8 @@ footer p { margin: 0; }
     overflow: hidden;
   }
 
-  .media-box {
+  /* Cut to a square, so the words in the video stay readable. */
+  .video-box {
     position: absolute;
     top: 0;
     right: 0;
@@ -506,15 +539,22 @@ footer p { margin: 0; }
     align-items: center;
     justify-content: center;
     width: auto;
-    height: var(--media-h);
+    height: var(--video-h);
     aspect-ratio: auto;
     overflow: hidden;
     opacity: calc(1 - 1.6 * var(--p, 0));
     transform: translateY(calc(-20% * var(--p, 0)));
+    mask-image: linear-gradient(to bottom, transparent, #000 10%, #000 85%, transparent);
   }
 
-  .hero .media {
-    width: min(calc(100% - 32px), calc(var(--media-h) * 16 / 9));
+  .video-controls { right: 12px; bottom: 18%; }
+
+  .hero video {
+    flex: none;
+    width: 100vw;
+    height: auto;
+    aspect-ratio: 1;
+    mask-image: none;
   }
 
   .snap-end {
@@ -571,9 +611,9 @@ footer p { margin: 0; }
 @media (max-width: 800px) and (max-height: 640px) {
   .hero { height: auto; padding: 24px 16px; }
   .stage { position: static; height: auto; overflow: visible; }
-  .media-box, .copy { position: static; height: auto; opacity: 1; transform: none; }
-  .media-box { margin-bottom: 24px; }
-  .hero .media { width: 100%; }
+  .video-box, .copy { position: static; height: auto; opacity: 1; transform: none; }
+  .video-box { position: relative; margin-bottom: 24px; }
+  .hero video { width: 100%; aspect-ratio: 16 / 9; }
   .titles, .actions { transform: none; }
   .snap-end { display: none; }
 }
@@ -608,11 +648,18 @@ footer p { margin: 0; }
   <section class="snap hero" id="download">
     <!-- On phones the stage stays put while the scroll zooms the text in. -->
     <div class="stage">
-      <div class="media-box">
-        <video class="media" src="busy-peasy-promo.mp4" poster="promo-poster.jpg" width="1280" height="720"
-               controls playsinline preload="none" aria-label="Watch the Busy Peasy promo">
+      <div class="video-box">
+        <video src="busy-peasy-promo.mp4" poster="promo-poster.jpg" autoplay muted loop playsinline aria-label="Busy Peasy promo">
           <a href="busy-peasy-promo.mp4">Watch the Busy Peasy promo</a>
         </video>
+        <div class="video-controls">
+          <button type="button" id="video-replay" aria-label="Replay">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 8a5.5 5.5 0 1 0 1.6-3.9"/><path d="M2.2 2.2v3.6h3.6"/></svg>
+          </button>
+          <button type="button" id="video-sound" aria-label="Sound" aria-pressed="false">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" aria-hidden="true"><path d="M2 6h2.5L8 3v10L4.5 10H2z" fill="currentColor" stroke="none"/><path class="sound-on" d="M10.5 5.5a3.5 3.5 0 0 1 0 5M12.5 3.5a6.5 6.5 0 0 1 0 9"/><path class="sound-off" d="m10.5 6 4 4m0-4-4 4"/></svg>
+          </button>
+        </div>
       </div>
       <div class="copy">
         <div class="titles">
@@ -791,6 +838,7 @@ const hero = document.getElementById("download");
 const stage = hero.querySelector(".stage");
 const copy = hero.querySelector(".copy");
 const titles = hero.querySelector(".titles");
+const controls = hero.querySelector(".video-controls");
 const phone = matchMedia("(max-width: 800px) and (min-height: 641px)");
 const START_SCALE = 0.68;
 const EDGE = 24;
@@ -798,6 +846,7 @@ const EDGE = 24;
 function updateZoom() {
   if (!phone.matches) {
     for (const name of ["--p", "--s", "--copy-y", "--titles-h"]) hero.style.removeProperty(name);
+    controls.inert = false;
     return;
   }
   const distance = hero.offsetHeight - stage.offsetHeight;
@@ -811,11 +860,37 @@ function updateZoom() {
   hero.style.setProperty("--s", scale.toFixed(3));
   hero.style.setProperty("--copy-y", `${(startY + (EDGE - startY) * p).toFixed(1)}px`);
   hero.style.setProperty("--titles-h", `${titlesHeight}px`);
+  // Hide the buttons from keyboard users when the video fades out.
+  controls.inert = p > 0.5;
 }
 
 addEventListener("scroll", () => requestAnimationFrame(updateZoom), { passive: true });
 addEventListener("resize", updateZoom);
 updateZoom();
+
+// The promo always plays, and starts over each time the top section comes
+// back to the middle of the screen (when its tab turns active).
+const video = hero.querySelector("video");
+const play = () => video.play().catch(() => {});
+new IntersectionObserver(([entry]) => {
+  if (!entry.isIntersecting) return;
+  video.currentTime = 0;
+  play();
+}, { rootMargin: "-50% 0px -50% 0px" }).observe(hero);
+// Browsers may pause it (for example in a background tab), so play it again.
+video.addEventListener("pause", () => { if (!document.hidden) play(); });
+document.addEventListener("visibilitychange", () => { if (!document.hidden) play(); });
+
+// Browsers autoplay only muted video, so sound starts off until a click.
+const sound = document.getElementById("video-sound");
+sound.addEventListener("click", () => {
+  video.muted = !video.muted;
+  sound.setAttribute("aria-pressed", String(!video.muted));
+});
+document.getElementById("video-replay").addEventListener("click", () => {
+  video.currentTime = 0;
+  play();
+});
 </script>
 </body>
 </html>
