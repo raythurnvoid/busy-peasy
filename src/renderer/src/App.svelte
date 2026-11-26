@@ -35,7 +35,7 @@
   import { scheduleDays } from './lib/layout'
   import { asksScope, choicesFor } from './lib/repeat'
   import { formats, loadSettings, prefs } from './lib/settings.svelte'
-  import { errorMessage, runAction, signIn, signInOutlook } from './lib/sign-in.svelte'
+  import { errorMessage, signIn, signInGoogle, signInOutlook } from './lib/sign-in.svelte'
   import {
     addDays,
     addMonths,
@@ -266,10 +266,10 @@
     })
   })
 
-  // The banner, the tray and the toast sign in here. Not while busy: a second Google sign-in would cancel the first.
+  // The banner, the tray and the toast share the same retry.
   function signInAgain(account: Account): void {
     if (signIn.busy) return
-    void (account.provider === 'outlook' ? signInOutlook(account.id) : runAction(window.api.addGoogleAccount))
+    void (account.provider === 'outlook' ? signInOutlook(account.id) : signInGoogle())
   }
 
   // An old tray item or toast for an account that is signed in again does nothing.
@@ -346,9 +346,9 @@
         settingsOpen = true
       } else if (name === 'addAccount') {
         if (args.provider !== 'google' && args.provider !== 'outlook') throw new Error('provider must be "google" or "outlook".')
-        if (signIn.busy) throw new Error('A sign-in is running in Busy Peasy. Wait until the user finishes it.')
+        if (signIn.busy || signIn.googleAttempt) throw new Error('A sign-in is running in Busy Peasy. Wait until the user finishes it.')
         // Not awaited: the user signs in now, which can take minutes. getState shows how it goes.
-        void (args.provider === 'google' ? runAction(window.api.addGoogleAccount) : signInOutlook())
+        void (args.provider === 'google' ? signInGoogle() : signInOutlook())
       } else {
         throw new Error('Unknown command')
       }
@@ -368,7 +368,7 @@
       quickCreate: draft !== null,
       search: search ? { text: search.ran, found: found?.length ?? null } : null,
       toast: toast?.text ?? null,
-      signIn: { running: signIn.busy || signIn.outlookOpen, error: signIn.error || null },
+      signIn: { running: signIn.busy || !!signIn.googleAttempt || signIn.outlookOpen, error: signIn.error || null },
       approval: approval ? `Busy Peasy is asking the user whether to allow "${approval.name}". Wait until the user answers.` : null
     }
   }

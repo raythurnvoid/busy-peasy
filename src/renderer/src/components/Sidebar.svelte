@@ -2,7 +2,7 @@
   import type { Account, Calendar } from '../../../shared/api'
   import { labelsHint } from '../../../shared/events'
   import { formats } from '../lib/settings.svelte'
-  import { runAction as run, signIn, signInOutlook } from '../lib/sign-in.svelte'
+  import { runAction as run, signIn, signInGoogle, signInOutlook } from '../lib/sign-in.svelte'
   import MiniMonth from './MiniMonth.svelte'
 
   let {
@@ -57,14 +57,14 @@
           <button
             class="pill-btn small"
             disabled={signIn.busy || signIn.outlookOpen}
-            onclick={() => (account.provider === 'outlook' ? signInOutlook(account.id) : run(window.api.addGoogleAccount))}>Sign in</button
+            onclick={() => (account.provider === 'outlook' ? signInOutlook(account.id) : signInGoogle())}>Sign in</button
           >
         {:else if account.status === 'error'}
-          <button class="pill-btn small" disabled={signIn.busy} onclick={() => run(window.api.syncNow)}>Retry</button>
+          <button class="pill-btn small" disabled={signIn.busy || !!signIn.googleAttempt} onclick={() => run(window.api.syncNow)}>Retry</button>
         {:else if calendars.some((c) => c.accountId === account.id && labelsHint(c, account))}
           <!-- A sign-in from before the labels scope: the 11 classic colors only. Not a warning. -->
           <div class="status">Sign in again to see all event colors.</div>
-          <button class="pill-btn small" disabled={signIn.busy} onclick={() => run(window.api.addGoogleAccount)}>Sign in</button>
+          <button class="pill-btn small" disabled={signIn.busy} onclick={signInGoogle}>Sign in</button>
         {/if}
       </div>
       {#each calendars.filter((c) => c.accountId === account.id) as calendar (calendar.id)}
@@ -78,7 +78,7 @@
           <span>{calendar.name}</span>
         </label>
       {/each}
-      <button class="link-btn" disabled={signIn.busy} onclick={() => {
+      <button class="link-btn" disabled={signIn.busy || !!signIn.googleAttempt} onclick={() => {
           if (confirm(`Remove ${account.email}? Its calendars and reminders leave this app until you add it again.`)) {
             void run(() => window.api.removeAccount(account.id))
           }
@@ -95,7 +95,7 @@
   {:else}
     <button class="pill-btn add" disabled={signIn.busy} onclick={() => signInOutlook()}>Add Microsoft 365 account</button>
   {/if}
-  <button class="pill-btn add" disabled={signIn.busy} onclick={() => run(window.api.addGoogleAccount)}>Add Google account</button>
+  <button class="pill-btn add" disabled={signIn.busy} onclick={signInGoogle}>Add Google account</button>
   {#if signIn.error}<p class="error" role="alert">{signIn.error}</p>{/if}
 </div>
 

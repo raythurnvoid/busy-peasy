@@ -1,5 +1,5 @@
 // Sign-in state shared by the sidebar and the "sign in again" banner.
-export const signIn = $state({ outlookOpen: false, busy: false, error: '' })
+export const signIn = $state({ outlookOpen: false, googleAttempt: null as Promise<void> | null, busy: false, error: '' })
 
 // Electron prefixes errors from main with "Error invoking remote method 'api': Error: ".
 export function errorMessage(e: unknown): string {
@@ -15,6 +15,20 @@ export async function runAction(action: () => Promise<void>): Promise<void> {
     signIn.error = errorMessage(e)
   } finally {
     signIn.busy = false
+  }
+}
+
+export async function signInGoogle(): Promise<void> {
+  signIn.error = ''
+  const attempt = window.api.addGoogleAccount()
+  signIn.googleAttempt = attempt
+  try {
+    await attempt
+  } catch (e) {
+    // A retry cancels the old attempt. Only show errors from the latest one.
+    if (signIn.googleAttempt === attempt) signIn.error = errorMessage(e)
+  } finally {
+    if (signIn.googleAttempt === attempt) signIn.googleAttempt = null
   }
 }
 
